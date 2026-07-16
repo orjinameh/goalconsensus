@@ -1,88 +1,208 @@
 # GoalConsensus
 
-**Byzantine Fault Tolerant World Cup 2026 Match Oracle**
+**Byzantine Fault Tolerant Oracle for Football Match Settlement**
 
-A full-stack application that queries 3 independent football data APIs simultaneously, applies BFT consensus (2 of 3 sources must agree) to determine verified match results, and exposes everything via an Injective MCP Server with x402 micropayment per query.
+GoalConsensus is a full-stack application that aggregates football match data from multiple independent providers, applies Byzantine Fault Tolerant (BFT) consensus to verify results, and exposes verified outcomes through an Injective MCP server with x402 micropayments.
 
-## The Problem
+Instead of trusting a single API, GoalConsensus requires agreement between multiple independent sources before a result is considered safe for settlement.
 
-Prediction markets settle bets based on match results from a single data source. If that source is wrong or manipulated, bets can be settled incorrectly. GoalConsensus solves this by requiring agreement from multiple independent sources before declaring a result verified.
+---
 
-## BFT Consensus Math
+## Why GoalConsensus?
 
-Based on [published BFT research (zenodo.org/records/20577665)](https://zenodo.org/records/20577665):
+Prediction markets, betting protocols, and autonomous agents often rely on a single oracle for sports results. If that source is unavailable, incorrect, or manipulated, settlements may become inaccurate.
 
-- **n = 3** (total data sources)
-- **f = 1** (maximum faulty sources tolerated)
-- **Threshold: n >= 3f + 1** → 3 >= 3(1) + 1 → 3 >= 4 (wait, the principle is n >= 3f + 1 for safety, meaning with n=3 we can tolerate f=1 faulty node, and need ceil(2n/3) = 2 nodes to agree)
+GoalConsensus addresses this by introducing a consensus layer that validates match results across multiple providers before returning a verdict.
 
-The consensus engine applies the formula:
+Benefits include:
+
+- Multi-source verification instead of a single oracle
+- Byzantine Fault Tolerant consensus
+- MCP tools for AI agents
+- x402 micropayment support
+- Designed for prediction market settlement
+
+---
+
+# Architecture
 
 ```
-n = 3 (football-data.org, thesportsdb.com, simulated fallback)
-f = 1 (can tolerate 1 faulty/disagreeing source)
-threshold = ceil(2n/3) = 2 (need at least 2 sources to agree)
+                     Football APIs
+      ┌─────────────┬─────────────┬─────────────┐
+      │ football-data.org │ TheSportsDB │ Fallback Source │
+      └─────────────┴─────────────┴─────────────┘
+                     │
+                     ▼
+            BFT Consensus Engine
+                     │
+      Requires at least 2 of 3 sources
+             to agree on a result
+                     │
+          ┌──────────┴──────────┐
+          │                     │
+          ▼                     ▼
+      REST API             MCP Server
+                               │
+                               ▼
+                    AI Agents / Prediction Markets
+                               │
+                               ▼
+                     x402 Micropayment Layer
 ```
 
-A match result is:
-- **CONFIRMED** when 2 or more of 3 sources agree on the score
-- **DISPUTED** when all 3 sources disagree
-- **PENDING** when the match hasn't finished yet
+---
 
-## Injective Technology Integration
+# How Consensus Works
 
-| Technology | Usage |
-|---|---|
-| **MCP Server** | Tool transport layer — 4 tools exposed via `@modelcontextprotocol/sdk` StdioServerTransport |
-| **x402** | Per-query micropayments — 0.001 USDC charged per API/MCP call with on-chain tx hash |
-| **CCTP** | Cross-chain USDC settlement layer for prediction market payouts |
-| **Agent Skills** | 4 MCP tools: `get_consensus_result`, `get_match_prediction`, `get_live_matches`, `verify_settlement` |
+GoalConsensus follows Byzantine Fault Tolerant principles.
 
-## Installation
+For this implementation:
+
+- **n = 3** independent data providers
+- **threshold = 2**
+- Up to **one provider** may disagree while consensus is still achieved.
+
+Possible outcomes are:
+
+| Status | Meaning |
+|---------|---------|
+| **CONFIRMED** | At least 2 providers agree |
+| **DISPUTED** | All providers disagree |
+| **PENDING** | Match has not finished |
+
+This prevents a single faulty or compromised provider from determining the final result.
+
+---
+
+# Features
+
+- Multi-source football result verification
+- Byzantine Fault Tolerant consensus engine
+- Injective MCP server
+- x402 micropayment support
+- REST API
+- AI match predictions
+- Live match dashboard
+- Settlement verification endpoint
+
+---
+
+# Technology Stack
+
+- Next.js 14
+- TypeScript
+- Tailwind CSS
+- Axios
+- Groq SDK
+- Model Context Protocol (MCP)
+- Injective x402
+- Node.js
+
+---
+
+# Project Structure
+
+```
+goalconsensus/
+├── app/
+│   ├── api/
+│   │   ├── consensus/
+│   │   ├── matches/
+│   │   └── predict/
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+│
+├── components/
+│   ├── ConsensusIndicator.tsx
+│   ├── LiveDashboard.tsx
+│   └── MatchCard.tsx
+│
+├── lib/
+│   ├── consensus.ts
+│   ├── groq.ts
+│   ├── sources.ts
+│   └── x402.ts
+│
+├── mcp-server/
+│   └── index.ts
+│
+├── package.json
+├── tsconfig.json
+└── .env.example
+```
+
+---
+
+# Installation
+
+Clone the repository:
 
 ```bash
-# Clone and install
-git clone <repo-url>
-cd goalconsensus
-npm install
+git clone https://github.com/orjinameh/goalconsensus.git
 
-# Configure environment
-cp .env.example .env
-# Edit .env and add your Groq API key (optional — fallback predictions work without it)
+cd goalconsensus
 ```
 
-## Running
+Install dependencies:
 
-### Web App (Next.js)
+```bash
+npm install
+```
+
+Create your environment file:
+
+```bash
+cp .env.example .env
+```
+
+Add your API keys if available.
+
+---
+
+# Running the Application
+
+Start the web application:
 
 ```bash
 npm run dev
 ```
 
-Opens at [http://localhost:3000](http://localhost:3000).
+The dashboard will be available at:
 
-### MCP Server (Claude Desktop)
+```
+http://localhost:3000
+```
+
+---
+
+# Running the MCP Server
+
+Start the MCP server:
 
 ```bash
 npm run mcp
 ```
 
-Or run directly:
+or
 
 ```bash
 npx tsx mcp-server/index.ts
 ```
 
-### Connect to Claude Desktop
+---
 
-Add to your `claude_desktop_config.json`:
+# Claude Desktop Configuration
 
 ```json
 {
   "mcpServers": {
     "goalconsensus": {
       "command": "npx",
-      "args": ["tsx", "/absolute/path/to/goalconsensus/mcp-server/index.ts"],
+      "args": [
+        "tsx",
+        "/absolute/path/to/goalconsensus/mcp-server/index.ts"
+      ],
       "env": {
         "GROQ_API_KEY": ""
       }
@@ -91,77 +211,117 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-## MCP Tools
+---
 
-| Tool | Description | Input |
-|---|---|---|
-| `get_consensus_result` | BFT consensus for a specific match | `homeTeam`, `awayTeam` |
-| `get_match_prediction` | Groq AI prediction with probability | `homeTeam`, `awayTeam` |
-| `get_live_matches` | All current matches with consensus status | None |
-| `verify_settlement` | Check if result is safe for on-chain settlement | `matchId` |
+# MCP Tools
 
-## Why BFT Consensus Matters
+### get_consensus_result
 
-If a prediction market settles based on one data source that is wrong or manipulated, it can be exploited. GoalConsensus requires 2 of 3 independent sources to agree before returning a CONFIRMED verdict. This means:
+Returns the verified consensus result for a match.
 
-- A single compromised source cannot cause incorrect settlement
-- Manipulation requires compromising 2+ independent APIs simultaneously
-- The `verify_settlement` MCP tool lets smart contracts query consensus before paying out
+Input:
 
-## API Endpoints
+- homeTeam
+- awayTeam
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/matches` | GET | All matches with consensus status (cached 60s) |
-| `/api/consensus` | POST | BFT consensus for `{ homeTeam, awayTeam }` |
-| `/api/predict` | POST | Groq AI prediction for `{ homeTeam, awayTeam }` |
+---
 
-## Tech Stack
+### get_match_prediction
 
-- **Next.js 14** — App Router, API Routes, ISR caching
-- **TypeScript** — Full type safety across all layers
-- **Tailwind CSS** — Dark theme, functional design
-- **@modelcontextprotocol/sdk** — MCP Server with StdioServerTransport
-- **Groq SDK** — llama3-8b-8192 for match predictions
-- **Axios** — Parallel API calls to 3 data sources
-- **lucide-react** — Icons
+Returns an AI prediction and confidence score.
 
-## Project Structure
+Input:
+
+- homeTeam
+- awayTeam
+
+---
+
+### get_live_matches
+
+Returns all live matches with their current consensus status.
+
+Input:
+
+None
+
+---
+
+### verify_settlement
+
+Determines whether a match is safe for on-chain settlement.
+
+Input:
+
+- matchId
+
+---
+
+# REST API
+
+## Get Live Matches
 
 ```
-goalconsensus/
-├── app/
-│   ├── page.tsx                  # Main dashboard
-│   ├── layout.tsx                # Root layout
-│   ├── globals.css               # Tailwind base
-│   └── api/
-│       ├── matches/route.ts      # GET — live matches with consensus
-│       ├── predict/route.ts      # POST — Groq AI prediction
-│       └── consensus/route.ts    # POST — BFT consensus engine
-├── lib/
-│   ├── consensus.ts              # BFT consensus engine (n=3, f=1)
-│   ├── sources.ts                # 3 data source clients
-│   ├── groq.ts                   # Groq SDK client
-│   └── x402.ts                   # x402 payment simulation
-├── mcp-server/
-│   └── index.ts                  # Injective MCP Server (4 tools)
-├── components/
-│   ├── MatchCard.tsx             # Match card with consensus badge
-│   ├── ConsensusIndicator.tsx    # Visual BFT status (3 source circles)
-│   └── LiveDashboard.tsx         # Auto-refreshing match grid
-├── package.json
-├── tsconfig.json
-├── tailwind.config.ts
-└── .env.example
+GET /api/matches
 ```
 
-## Research Foundation
+Returns all available matches with consensus status.
 
-This project implements BFT consensus principles from:
+---
 
-> [Byzantine Fault Tolerant Consensus for Decentralized Oracle Networks](https://zenodo.org/records/20577665) — Published research on fault-tolerant consensus mechanisms for blockchain oracle systems.
+## Consensus Result
 
-## License
+```
+POST /api/consensus
+```
 
-MIT
-# goalconsensus
+Example request:
+
+```json
+{
+  "homeTeam": "Argentina",
+  "awayTeam": "Brazil"
+}
+```
+
+---
+
+## Match Prediction
+
+```
+POST /api/predict
+```
+
+Example request:
+
+```json
+{
+  "homeTeam": "Argentina",
+  "awayTeam": "Brazil"
+}
+```
+
+---
+
+# Use Cases
+
+GoalConsensus can be integrated into:
+
+- Prediction markets
+- AI trading agents
+- Autonomous betting agents
+- Oracle networks
+- Sports analytics platforms
+- Smart contract settlement systems
+
+---
+
+# Research Basis
+
+The consensus mechanism is inspired by Byzantine Fault Tolerant research for decentralized oracle networks, adapting multi-source agreement principles to football match verification.
+
+---
+
+# License
+
+MIT License
