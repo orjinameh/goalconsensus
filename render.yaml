@@ -12,3 +12,13 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+
+  - type: cron
+    name: goalconsensus-keepalive
+    runtime: node
+    plan: free
+    schedule: "*/10 * * * *"
+    startCommand: node -e "const https=require('https');https.get('https://goalconsensus.onrender.com/api/matches',r=>{console.log('status:',r.statusCode)}).on('error',e=>console.error(e.message))"
+    envVars:
+      - key: NODE_ENV
+        value: production
