@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { MatchResult, ProviderHealth } from "@/lib/providers";
-import { ConsensusVerdict } from "@/lib/consensus";
+import { ConsensusResult } from "@/lib/consensus";
 import { MatchCard } from "./MatchCard";
 
-type EnrichedMatch = MatchResult & { consensus: ConsensusVerdict };
+type EnrichedMatch = MatchResult & { consensus: ConsensusResult };
 
 export function LiveDashboard() {
   const [matches, setMatches] = useState<EnrichedMatch[]>([]);

@@ -89,14 +89,11 @@ class FootballDataProvider implements Provider {
       return (res.data.matches || []).map((m: Record<string, unknown>) => {
         const home = m.homeTeam as Record<string, string> | undefined;
         const away = m.awayTeam as Record<string, string> | undefined;
-        const score = m.score as
-          | Record<string, Record<string, number>>
-          | undefined;
+        const score = m.score as Record<string, Record<string, number>> | undefined;
         const fullTime = score?.fullTime;
         let status: "SCHEDULED" | "LIVE" | "FINISHED" = "SCHEDULED";
         if (m.status === "FINISHED") status = "FINISHED";
-        else if (m.status === "IN_PLAY" || m.status === "PAUSED")
-          status = "LIVE";
+        else if (m.status === "IN_PLAY" || m.status === "PAUSED") status = "LIVE";
         return {
           id: `${this.metadata.id}-${m.id}`,
           homeTeam: home?.name || "Unknown",
@@ -156,12 +153,8 @@ class TheSportsDBProvider implements Provider {
             id: `${this.metadata.id}-${e.idEvent}`,
             homeTeam: (e.strHomeTeam as string) || "Unknown",
             awayTeam: (e.strAwayTeam as string) || "Unknown",
-            homeScore: e.intHomeScore
-              ? parseInt(e.intHomeScore as string, 10)
-              : null,
-            awayScore: e.intAwayScore
-              ? parseInt(e.intAwayScore as string, 10)
-              : null,
+            homeScore: e.intHomeScore ? parseInt(e.intHomeScore as string, 10) : null,
+            awayScore: e.intAwayScore ? parseInt(e.intAwayScore as string, 10) : null,
             status:
               e.strStatus === "Match Finished"
                 ? "FINISHED"
@@ -202,85 +195,9 @@ class TheSportsDBProvider implements Provider {
   }
 }
 
-class ApiFootballProvider implements Provider {
-  metadata: ProviderMetadata = {
-    id: "api-football",
-    name: "api-football.com (RapidAPI)",
-    baseUrl: "https://api-football-v1.p.rapidapi.com/v3",
-    rateLimit: "100 req/day (free tier)",
-  };
-
-  async fetchMatches(): Promise<MatchResult[]> {
-    return withRetry(async () => {
-      const res = await axios.get(`${this.metadata.baseUrl}/fixtures`, {
-        params: { league: 1, season: 2026 },
-        headers: {
-          "x-rapidapi-key": process.env.APIFOOTBALL_API_KEY || "",
-          "x-rapidapi-host": "api-football-v1.p.rapidapi.com",
-        },
-        timeout: DEFAULT_TIMEOUT,
-      });
-      return (res.data.response || []).map((f: Record<string, unknown>) => {
-        const teams = f.teams as Record<string, Record<string, string>>;
-        const goals = f.goals as Record<string, number | null>;
-        const fixture = f.fixture as Record<string, unknown>;
-        const statusObj = fixture?.status as Record<string, string> | undefined;
-        let status: "SCHEDULED" | "LIVE" | "FINISHED" = "SCHEDULED";
-        if (statusObj?.short === "FT") status = "FINISHED";
-        else if (
-          statusObj?.short === "1H" ||
-          statusObj?.short === "2H" ||
-          statusObj?.short === "ET" ||
-          statusObj?.short === "BT"
-        )
-          status = "LIVE";
-        return {
-          id: `${this.metadata.id}-${fixture?.id}`,
-          homeTeam: teams?.home?.name || "Unknown",
-          awayTeam: teams?.away?.name || "Unknown",
-          homeScore: goals?.home ?? null,
-          awayScore: goals?.away ?? null,
-          status,
-          matchDate:
-            (fixture?.date as string) || new Date().toISOString(),
-          providerId: this.metadata.id,
-        } as MatchResult;
-      });
-    });
-  }
-
-  async healthCheck(): Promise<ProviderHealth> {
-    const start = Date.now();
-    try {
-      await axios.get(`${this.metadata.baseUrl}/status`, {
-        headers: {
-          "x-rapidapi-key": process.env.APIFOOTBALL_API_KEY || "",
-          "x-rapidapi-host": "api-football-v1.p.rapidapi.com",
-        },
-        timeout: DEFAULT_TIMEOUT,
-      });
-      return {
-        providerId: this.metadata.id,
-        available: true,
-        latencyMs: Date.now() - start,
-        lastChecked: new Date().toISOString(),
-      };
-    } catch (err) {
-      return {
-        providerId: this.metadata.id,
-        available: false,
-        latencyMs: Date.now() - start,
-        lastChecked: new Date().toISOString(),
-        error: err instanceof Error ? err.message : "Unknown error",
-      };
-    }
-  }
-}
-
 export const providers: Provider[] = [
   new FootballDataProvider(),
   new TheSportsDBProvider(),
-  new ApiFootballProvider(),
 ];
 
 export async function fetchAllProviders(): Promise<ProviderResult[]> {
@@ -343,4 +260,31 @@ export async function fetchMatchesForPair(
         teamMatches(m.homeTeam, homeTeam) && teamMatches(m.awayTeam, awayTeam)
     ),
   }));
+}
+
+export async function buildCanonicalState(
+  homeTeam: string,
+  awayTeam: string
+): Promise<import("./agents/types").CanonicalMatchState | null> {
+  const providerResults = await fetchMatchesForPair(homeTeam, awayTeam);
+  const responding = providerResults.filter((pr) => pr.health.available);
+  const allMatches = responding.flatMap((pr) => pr.matches);
+
+  if (allMatches.length === 0) return null;
+
+  const providerAgreement = responding.length >= 2;
+  const first = allMatches[0];
+
+  return {
+    homeTeam: first.homeTeam,
+    awayTeam: first.awayTeam,
+    homeScore: first.homeScore,
+    awayScore: first.awayScore,
+    status: first.status,
+    matchDate: first.matchDate,
+    providerAgreement,
+    providerCount: responding.length,
+    providerHealth: providerResults.map((pr) => pr.health),
+    rawResults: allMatches,
+  };
 }

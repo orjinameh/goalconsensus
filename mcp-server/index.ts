@@ -4,55 +4,86 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-import { fetchAllProviders, fetchMatchesForPair } from "../lib/providers.js";
-import { computeConsensus } from "../lib/consensus.js";
-import { predictMatch } from "../lib/groq.js";
+import { fetchAllProviders, fetchMatchesForPair, buildCanonicalState } from "../lib/providers.js";
+import { agents } from "../lib/agents/index.js";
+import { computeAgentConsensus } from "../lib/consensus.js";
 import { chargeX402, formatX402Header } from "../lib/x402.js";
 
 const server = new McpServer({
   name: "goalconsensus-mcp",
-  version: "1.0.0",
+  version: "2.0.0",
 });
 
 server.tool(
   "get_consensus_result",
-  "Get BFT consensus result for a World Cup 2026 match. Queries independent providers and applies Byzantine Fault Tolerant consensus.",
+  "Get multi-agent consensus for a World Cup 2026 match. Canonical state from 2 providers, verified by 3 analysis agents with Byzantine-inspired voting.",
   {
     homeTeam: z.string().describe("Home team name (e.g. Argentina)"),
     awayTeam: z.string().describe("Away team name (e.g. France)"),
   },
   async ({ homeTeam, awayTeam }) => {
-    const providerResults = await fetchMatchesForPair(homeTeam, awayTeam);
-    const verdict = computeConsensus(providerResults);
+    const canonicalState = await buildCanonicalState(homeTeam, awayTeam);
+
+    if (!canonicalState) {
+      const queryId = `mcp-consensus-${Date.now()}`;
+      const payment = chargeX402("get_consensus_result", queryId);
+      return {
+        content: [{
+          type: "text",
+          text: [
+            `## Consensus: ${homeTeam} vs ${awayTeam}`,
+            ``,
+            `**Status:** INSUFFICIENT_DATA`,
+            `**Reason:** No canonical match state available. Both providers returned no data.`,
+            ``,
+            `---`,
+            `**x402 Payment:** ${payment.amount} on ${payment.chain}`,
+            `**TX Hash:** \`${payment.txHash}\``,
+          ].join("\n"),
+        }],
+      };
+    }
+
+    const agentOutputs = await Promise.all(
+      agents.map((agent) => agent.verify(canonicalState))
+    );
+
+    const consensus = computeAgentConsensus(agentOutputs, canonicalState);
     const queryId = `mcp-consensus-${Date.now()}`;
     const payment = chargeX402("get_consensus_result", queryId);
 
-    const healthLines = providerResults
+    const agentLines = agentOutputs
       .map(
-        (pr) =>
-          `  - ${pr.providerId}: ${pr.health.available ? `OK (${pr.health.latencyMs}ms)` : `DOWN (${pr.health.error || "unavailable"})`}`
+        (a) =>
+          `  - ${a.agentName}: ${a.prediction.winner} (${a.confidence}%) — ${a.explanation.slice(0, 120)}...`
       )
       .join("\n");
 
+    const evidenceLines = consensus.evidence
+      .map((e) => `  - [${e.source}] ${e.detail}`)
+      .join("\n");
+
     const text = [
-      `## BFT Consensus: ${homeTeam} vs ${awayTeam}`,
+      `## Multi-Agent Consensus: ${homeTeam} vs ${awayTeam}`,
       ``,
-      `**Verdict:** ${verdict.verdict}`,
-      `**Confidence:** ${verdict.confidence}%`,
-      `**Passing Nodes:** ${verdict.passingNodes}/${verdict.totalNodes}`,
+      `**Canonical State:** ${canonicalState.homeTeam} ${canonicalState.homeScore ?? "?"} - ${canonicalState.awayScore ?? "?"} ${canonicalState.awayTeam} [${canonicalState.status}]`,
+      `**Provider Agreement:** ${canonicalState.providerAgreement ? "YES" : "NO"} (${canonicalState.providerCount} providers)`,
       ``,
-      verdict.agreedResult
-        ? `**Result:** ${verdict.agreedResult.homeTeam} ${verdict.agreedResult.homeScore ?? "?"} - ${verdict.agreedResult.awayScore ?? "?"} ${verdict.agreedResult.awayTeam}`
+      `**Settlement Decision:** ${consensus.settlementDecision}`,
+      `**Agreement:** ${consensus.agreement}/${consensus.totalAgents} agents`,
+      `**Confidence:** ${consensus.confidence}%`,
+      ``,
+      consensus.minorityOpinion
+        ? `**Minority Opinion:** ${consensus.minorityOpinion.agentName} predicted ${consensus.minorityOpinion.prediction.winner}`
         : "",
       ``,
-      `**Explanation:** ${verdict.explanation}`,
+      `**Agent Outputs:**`,
+      agentLines,
       ``,
-      verdict.conflictingProviders.length > 0
-        ? `**Conflicting Providers:** ${verdict.conflictingProviders.join(", ")}`
-        : "",
+      `**Evidence:**`,
+      evidenceLines,
       ``,
-      `**Provider Health:**`,
-      healthLines,
+      `**Reasoning:** ${consensus.reasoning}`,
       ``,
       `---`,
       `**x402 Payment:** ${payment.amount} on ${payment.chain}`,
@@ -68,26 +99,50 @@ server.tool(
 
 server.tool(
   "get_match_prediction",
-  "Get AI-powered prediction for a World Cup 2026 match using Groq LLM.",
+  "Get individual agent predictions for a World Cup 2026 match. Returns output from all 3 verification agents.",
   {
     homeTeam: z.string().describe("Home team name"),
     awayTeam: z.string().describe("Away team name"),
   },
   async ({ homeTeam, awayTeam }) => {
-    const prediction = await predictMatch(homeTeam, awayTeam);
+    const canonicalState = await buildCanonicalState(homeTeam, awayTeam);
+
+    if (!canonicalState) {
+      const queryId = `mcp-predict-${Date.now()}`;
+      const payment = chargeX402("get_match_prediction", queryId);
+      return {
+        content: [{
+          type: "text",
+          text: `No match data available for ${homeTeam} vs ${awayTeam}.\nx402: ${payment.amount}`,
+        }],
+      };
+    }
+
+    const agentOutputs = await Promise.all(
+      agents.map((agent) => agent.verify(canonicalState))
+    );
+
     const queryId = `mcp-predict-${Date.now()}`;
     const payment = chargeX402("get_match_prediction", queryId);
 
+    const agentSections = agentOutputs
+      .map(
+        (a) =>
+          `### ${a.agentName}\n` +
+          `**Prediction:** ${a.prediction.winner} ${a.prediction.homeScore ?? "?"}-${a.prediction.awayScore ?? "?"}\n` +
+          `**Confidence:** ${a.confidence}%\n` +
+          `**Latency:** ${a.latencyMs}ms\n` +
+          `**Explanation:** ${a.explanation}\n` +
+          `**Evidence:**\n${a.evidence.map((e) => `  - ${e.detail}`).join("\n")}`
+      )
+      .join("\n\n");
+
     const text = [
-      `## AI Prediction: ${homeTeam} vs ${awayTeam}`,
+      `## Agent Predictions: ${homeTeam} vs ${awayTeam}`,
       ``,
-      `**Predicted Winner:** ${prediction.predictedWinner}`,
-      `**Win Probability:** ${prediction.winProbability}%`,
-      `**Predicted Score:** ${prediction.predictedScore}`,
-      `**Confidence:** ${prediction.confidence}`,
+      `**Canonical State:** ${canonicalState.status} — ${canonicalState.homeScore ?? "?"}-${canonicalState.awayScore ?? "?"}`,
       ``,
-      `**Key Factors:**`,
-      ...prediction.keyFactors.map((f) => `- ${f}`),
+      agentSections,
       ``,
       `---`,
       `**x402 Payment:** ${payment.amount} on ${payment.chain}`,
@@ -100,11 +155,10 @@ server.tool(
 
 server.tool(
   "get_live_matches",
-  "Get all current World Cup 2026 matches with their BFT consensus status.",
+  "Get all current World Cup 2026 matches with multi-agent consensus status.",
   {},
   async () => {
     const providerResults = await fetchAllProviders();
-
     const allMatches = providerResults.flatMap((pr) => pr.matches);
     const grouped = new Map<string, typeof allMatches>();
     for (const m of allMatches) {
@@ -116,23 +170,34 @@ server.tool(
     const lines: string[] = ["## Live World Cup 2026 Matches", ""];
 
     for (const [, group] of grouped) {
-      const matchProviderResults = providerResults.map((pr) => ({
-        ...pr,
-        matches: pr.matches.filter(
-          (m) =>
-            m.homeTeam.toLowerCase() === group[0].homeTeam.toLowerCase() &&
-            m.awayTeam.toLowerCase() === group[0].awayTeam.toLowerCase()
-        ),
-      }));
-      const verdict = computeConsensus(matchProviderResults);
-      const m = group[0];
+      const first = group[0];
+      const responding = providerResults.filter((pr) => pr.health.available);
+      const canonicalState = {
+        homeTeam: first.homeTeam,
+        awayTeam: first.awayTeam,
+        homeScore: first.homeScore,
+        awayScore: first.awayScore,
+        status: first.status,
+        matchDate: first.matchDate,
+        providerAgreement: responding.length >= 2,
+        providerCount: responding.length,
+        providerHealth: providerResults.map((pr) => pr.health),
+        rawResults: group,
+      };
+
+      const agentOutputs = await Promise.all(
+        agents.map((agent) => agent.verify(canonicalState))
+      );
+      const consensus = computeAgentConsensus(agentOutputs, canonicalState);
+
       const score =
-        m.homeScore !== null && m.awayScore !== null
-          ? `${m.homeScore} - ${m.awayScore}`
+        first.homeScore !== null && first.awayScore !== null
+          ? `${first.homeScore} - ${first.awayScore}`
           : "vs";
+
       lines.push(
-        `**${m.homeTeam}** ${score} **${m.awayTeam}** [${m.status}]`,
-        `  Consensus: ${verdict.verdict} (${verdict.confidence}%) — ${verdict.explanation}`,
+        `**${first.homeTeam}** ${score} **${first.awayTeam}** [${first.status}]`,
+        `  Settlement: ${consensus.settlementDecision} | Confidence: ${consensus.confidence}% | Votes: ${consensus.agreement}/${consensus.totalAgents}`,
         ""
       );
     }
@@ -162,13 +227,12 @@ server.tool(
 
 server.tool(
   "verify_settlement",
-  "Check whether a match result has reached BFT consensus and is safe for on-chain settlement of prediction markets.",
+  "Check whether a match result is safe for on-chain settlement using multi-agent consensus.",
   {
     matchId: z.string().describe("Match ID or team pair identifier"),
   },
   async ({ matchId }) => {
     const providerResults = await fetchAllProviders();
-
     const allMatches = providerResults.flatMap((pr) => pr.matches);
     const matching = allMatches.filter(
       (m) =>
@@ -177,49 +241,74 @@ server.tool(
         m.awayTeam.toLowerCase().includes(matchId.toLowerCase())
     );
 
-    const matchProviderResults = providerResults.map((pr) => ({
-      ...pr,
-      matches: pr.matches.filter(
-        (m) =>
-          m.id.includes(matchId) ||
-          m.homeTeam.toLowerCase().includes(matchId.toLowerCase()) ||
-          m.awayTeam.toLowerCase().includes(matchId.toLowerCase())
-      ),
-    }));
+    if (matching.length === 0) {
+      const queryId = `mcp-settle-${Date.now()}`;
+      const payment = chargeX402("verify_settlement", queryId);
+      return {
+        content: [{
+          type: "text",
+          text: [
+            `## Settlement Verification: ${matchId}`,
+            ``,
+            `**Safe for Settlement:** NO`,
+            `**Reason:** No matching data found for "${matchId}".`,
+            ``,
+            `---`,
+            `**x402 Payment:** ${payment.amount} on ${payment.chain}`,
+            `**TX Hash:** \`${payment.txHash}\``,
+          ].join("\n"),
+        }],
+      };
+    }
 
-    const verdict = computeConsensus(matchProviderResults);
-    const safe = verdict.verdict === "CONFIRMED";
+    const first = matching[0];
+    const responding = providerResults.filter((pr) => pr.health.available);
+    const canonicalState = {
+      homeTeam: first.homeTeam,
+      awayTeam: first.awayTeam,
+      homeScore: first.homeScore,
+      awayScore: first.awayScore,
+      status: first.status,
+      matchDate: first.matchDate,
+      providerAgreement: responding.length >= 2,
+      providerCount: responding.length,
+      providerHealth: providerResults.map((pr) => pr.health),
+      rawResults: matching,
+    };
+
+    const agentOutputs = await Promise.all(
+      agents.map((agent) => agent.verify(canonicalState))
+    );
+
+    const consensus = computeAgentConsensus(agentOutputs, canonicalState);
+    const safe = consensus.settlementDecision === "SETTLE";
 
     const queryId = `mcp-settle-${Date.now()}`;
     const payment = chargeX402("verify_settlement", queryId);
 
-    const healthLines = providerResults
-      .map(
-        (pr) =>
-          `  - ${pr.providerId}: ${pr.health.available ? `OK (${pr.health.latencyMs}ms)` : `DOWN`}`
-      )
+    const agentLines = agentOutputs
+      .map((a) => `  - ${a.agentName}: ${a.prediction.winner} (${a.confidence}%)`)
       .join("\n");
 
     const text = [
       `## Settlement Verification: ${matchId}`,
       ``,
       `**Safe for Settlement:** ${safe ? "YES" : "NO"}`,
-      `**Verdict:** ${verdict.verdict}`,
-      `**Confidence:** ${verdict.confidence}%`,
-      `**Passing Nodes:** ${verdict.passingNodes}/${verdict.totalNodes}`,
+      `**Settlement Decision:** ${consensus.settlementDecision}`,
+      `**Confidence:** ${consensus.confidence}%`,
+      `**Agreement:** ${consensus.agreement}/${consensus.totalAgents} agents`,
       ``,
-      verdict.agreedResult
-        ? `**Canonical Result:** ${verdict.agreedResult.homeTeam} ${verdict.agreedResult.awayScore ?? "?"} - ${verdict.agreedResult.awayScore ?? "?"} ${verdict.agreedResult.awayTeam}`
-        : "",
+      `**Canonical Result:** ${canonicalState.homeTeam} ${canonicalState.homeScore ?? "?"} - ${canonicalState.awayScore ?? "?"} ${canonicalState.awayTeam}`,
+      `**Provider Agreement:** ${canonicalState.providerAgreement ? "YES" : "NO"}`,
       ``,
-      `**Explanation:** ${verdict.explanation}`,
+      `**Agent Outputs:**`,
+      agentLines,
       ``,
-      `**Provider Health:**`,
-      healthLines,
+      `**Reasoning:** ${consensus.reasoning}`,
       ``,
       safe
-        ? "This result has passed BFT consensus threshold. Safe to settle prediction market bets."
-        : "DO NOT SETTLE. This result has NOT passed BFT consensus. Wait for more provider data or manual verification.",
+        ? "This result has passed multi-agent Byzantine consensus. Safe to settle prediction market bets."
+        : "DO NOT SETTLE. This result has NOT passed multi-agent consensus. Wait for more data or manual verification.",
       ``,
       `---`,
       `**x402 Payment:** ${payment.amount} on ${payment.chain}`,
@@ -235,7 +324,7 @@ server.tool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("GoalConsensus MCP Server running on stdio");
+  console.error("GoalConsensus MCP Server v2.0 running on stdio");
 }
 
 main().catch((err) => {

@@ -1,121 +1,142 @@
 # GoalConsensus
 
-**Byzantine Fault Tolerant World Cup 2026 Match Oracle**
+**Multi-Agent Settlement Verification Platform**
 
-A full-stack application that queries 3 independent football data providers, applies BFT consensus to determine verified match results, and exposes everything via an MCP Server with x402 micropayment per query.
+A full-stack application that establishes canonical match state from independent data providers, then verifies results through three independent analysis agents with Byzantine-inspired consensus — exposing everything via an MCP Server with x402 micropayments.
 
 ## Architecture
 
-GoalConsensus uses a **provider-based architecture** where every match result must come from a verified, independent data provider. No simulated or fabricated data is used at any layer.
-
-### Provider Interface
-
-Each data source implements the `Provider` interface:
-
-```typescript
-interface Provider {
-  metadata: ProviderMetadata;  // id, name, baseUrl, rateLimit
-  fetchMatches(): Promise<MatchResult[]>;
-  healthCheck(): Promise<ProviderHealth>;
-}
+```
+Data Providers (2)          Verification Agents (3)         Consensus
+┌─────────────────┐         ┌──────────────────────┐       ┌─────────────────┐
+│ football-data   │──┐      │ Statistical Agent    │──┐    │                 │
+│ thesportsdb     │──┼──────│ LLM Reasoning Agent  │──┼───▶│ Byzantine Vote  │──▶ Settlement
+│                 │──┘      │ Deterministic Rules  │──┘    │                 │
+└─────────────────┘         └──────────────────────┘       └─────────────────┘
+     Canonical State               Agent Outputs                Decision
 ```
 
-Providers include built-in timeout, retry logic (2 retries with exponential backoff), and health reporting.
+### Data Layer
 
-### Registered Providers
+Two independent providers establish the **canonical match state**:
 
 | Provider | Source | API Key |
 |---|---|---|
 | `football-data` | football-data.org | `FOOTBALL_DATA_API_KEY` |
 | `thesportsdb` | thesportsdb.com | Free (no key) |
-| `api-football` | api-football via RapidAPI | `APIFOOTBALL_API_KEY` |
 
-### BFT Consensus
+If fewer than 2 providers respond, the canonical state cannot be established and the system returns `INSUFFICIENT_DATA`.
 
-Consensus is computed dynamically based on how many providers actually respond:
+### Analysis Layer
 
+Three independent verification agents analyze the canonical state:
+
+#### 1. Statistical Agent
+- Poisson regression model for goal prediction
+- Team strength ratings (0-100 scale)
+- Monte Carlo simulation for win/draw/loss probabilities
+- Produces predicted score and confidence
+
+#### 2. LLM Reasoning Agent
+- Uses Groq (llama3-8b-8192) for contextual analysis
+- Reasons about form, venue advantage, squad depth, tournament momentum
+- Produces structured JSON with prediction, confidence, and key factors
+- Falls back to home advantage heuristic when API unavailable
+
+#### 3. Deterministic Rules Agent
+- Provider agreement validation (2+ providers required)
+- Match completion verification
+- Timestamp validation (within ±24h to +48h)
+- Data consistency checks (plausible scores)
+- Provider health verification
+
+Each agent returns:
+```typescript
+{
+  prediction: { winner, homeScore, awayScore },
+  confidence: number,       // 0-100
+  explanation: string,
+  evidence: AgentEvidence[]
+}
 ```
-n = number of responding providers (dynamic)
-f = floor((n-1)/3) — maximum faulty sources tolerated
-threshold = ceil(2n/3) — providers that must agree
-min_providers = 2 — minimum needed for any verdict
+
+### Consensus Layer
+
+Byzantine-inspired majority voting across the three agents:
+
+- **n = 3** (verification agents)
+- **threshold = ceil(2n/3) = 2** (agents that must agree)
+- Confidence = `(agreeing_agents / total_agents) * 100`
+
+| Decision | Condition |
+|---|---|
+| `SETTLE` | ≥2 agents agree + match FINISHED + provider agreement |
+| `DO_NOT_SETTLE` | Agents disagree or threshold not met |
+| `PENDING` | Match not yet finished |
+| `INSUFFICIENT_DATA` | <2 providers or no agent outputs |
+
+Consensus returns:
+```typescript
+{
+  finalPrediction,
+  agreement,
+  confidence,
+  minorityOpinion,
+  evidence,
+  reasoning,
+  settlementDecision,
+  agents,           // individual agent outputs
+  canonicalState    // raw provider data
+}
 ```
-
-- **CONFIRMED** — threshold or more providers agree on the score
-- **DISPUTED** — providers respond but disagree; threshold not met
-- **PENDING** — match has not finished yet
-- **INSUFFICIENT_DATA** — fewer than 2 providers responded
-
-Confidence is calculated as `(agreeing_providers / total_responding) * 100`, reflecting actual provider agreement rather than a fixed denominator.
-
-### Provider Health
-
-Every API response includes `providerHealth` — an array showing each provider's availability, latency, and any error. The UI displays provider status in real time, showing unavailable providers instead of silently substituting fake data.
 
 ## The Problem
 
-Prediction markets settle bets based on match results from a single data source. If that source is wrong or manipulated, bets can be settled incorrectly. GoalConsensus solves this by requiring agreement from multiple independent sources before declaring a result verified.
+Prediction markets settle bets based on match results from a single data source. If that source is wrong or manipulated, bets can be settled incorrectly. GoalConsensus solves this by:
+1. Requiring agreement from multiple independent data providers
+2. Running three independent verification agents
+3. Applying Byzantine-inspired consensus before recommending settlement
 
 ## Injective Technology Integration
 
 | Technology | Usage |
 |---|---|
-| **MCP Server** | Tool transport layer — 4 tools exposed via `@modelcontextprotocol/sdk` StdioServerTransport |
-| **x402** | Per-query micropayments — 0.001 USDC charged per API/MCP call with on-chain tx hash |
-| **CCTP** | Cross-chain USDC settlement layer for prediction market payouts |
-| **Agent Skills** | 4 MCP tools: `get_consensus_result`, `get_match_prediction`, `get_live_matches`, `verify_settlement` |
+| **MCP Server** | Tool transport — 4 tools via `@modelcontextprotocol/sdk` |
+| **x402** | Per-query micropayments — 0.001 USDC per API/MCP call |
+| **CCTP** | Cross-chain USDC settlement for prediction market payouts |
+| **Agent Skills** | 4 MCP tools with full agent reasoning and evidence |
 
 ## Installation
 
 ```bash
-# Clone and install
 git clone <repo-url>
 cd goalconsensus
 npm install
 
-# Configure environment
 cp .env.example .env
-# Edit .env and add your API keys:
-#   FOOTBALL_DATA_API_KEY — get from https://www.football-data.org/client/register
-#   APIFOOTBALL_API_KEY — get from https://rapidapi.com/api-sports/api/api-football
-#   GROQ_API_KEY — optional, for AI predictions
+# Configure:
+#   FOOTBALL_DATA_API_KEY — https://www.football-data.org/client/register
+#   GROQ_API_KEY — optional, for LLM Reasoning Agent
 ```
 
 ## Running
 
-### Web App (Next.js)
-
 ```bash
-npm run dev
+npm run dev      # Next.js app at http://localhost:3000
+npm run mcp      # MCP Server (stdio)
+npm test         # Unit tests (18 test cases)
 ```
 
-Opens at [http://localhost:3000](http://localhost:3000).
-
-### MCP Server (Claude Desktop)
-
-```bash
-npm run mcp
-```
-
-### Tests
-
-```bash
-npm test
-```
-
-### Connect to Claude Desktop
-
-Add to your `claude_desktop_config.json`:
+### Claude Desktop
 
 ```json
 {
   "mcpServers": {
     "goalconsensus": {
       "command": "npx",
-      "args": ["tsx", "/absolute/path/to/goalconsensus/mcp-server/index.ts"],
+      "args": ["tsx", "/path/to/goalconsensus/mcp-server/index.ts"],
       "env": {
         "FOOTBALL_DATA_API_KEY": "",
-        "APIFOOTBALL_API_KEY": "",
         "GROQ_API_KEY": ""
       }
     }
@@ -127,46 +148,35 @@ Add to your `claude_desktop_config.json`:
 
 | Tool | Description | Input |
 |---|---|---|
-| `get_consensus_result` | BFT consensus for a specific match | `homeTeam`, `awayTeam` |
-| `get_match_prediction` | Groq AI prediction with probability | `homeTeam`, `awayTeam` |
-| `get_live_matches` | All current matches with consensus status | None |
+| `get_consensus_result` | Full multi-agent consensus with settlement decision | `homeTeam`, `awayTeam` |
+| `get_match_prediction` | Individual agent predictions with evidence | `homeTeam`, `awayTeam` |
+| `get_live_matches` | All matches with consensus status | None |
 | `verify_settlement` | Check if result is safe for on-chain settlement | `matchId` |
 
-## Why BFT Consensus Matters
-
-If a prediction market settles based on one data source that is wrong or manipulated, it can be exploited. GoalConsensus requires agreement from multiple independent providers before returning a CONFIRMED verdict. This means:
-
-- A single compromised source cannot cause incorrect settlement
-- Manipulation requires compromising multiple independent APIs simultaneously
-- The `verify_settlement` MCP tool lets smart contracts query consensus before paying out
+All tools return agent reasoning, evidence, provider health, and x402 payment receipts.
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/matches` | GET | All matches with consensus status and provider health |
-| `/api/consensus` | POST | BFT consensus for `{ homeTeam, awayTeam }` with provider health |
-| `/api/predict` | POST | Groq AI prediction for `{ homeTeam, awayTeam }` |
-
-All responses include `providerHealth` showing the status of each data provider.
+| `/api/matches` | GET | Matches with agent consensus + provider health |
+| `/api/consensus` | POST | Full consensus: `{ homeTeam, awayTeam }` |
+| `/api/predict` | POST | Agent predictions: `{ homeTeam, awayTeam }` |
 
 ## Test Coverage
 
-Unit tests cover the consensus engine with 18 test cases:
-
-- One provider responding (insufficient data)
-- Two agreeing providers (confirmed)
-- Two disagreeing providers (disputed)
-- Three agreeing providers (confirmed, 100% confidence)
-- Three providers with partial agreement (confirmed, 67% confidence)
-- All providers unavailable (insufficient data)
-- Two of three providers timing out (insufficient data)
-- One provider down, two agreeing (confirmed)
-- No match data returned (insufficient data)
-- Scheduled/live matches (pending)
-- Dynamic BFT threshold calculation
-- Provider health propagation
-- No simulated data references
+18 unit tests covering:
+- Three agreeing agents (SETTLE)
+- Two agreeing, one disagreeing (SETTLE with minority)
+- All three disagreeing (DO_NOT_SETTLE)
+- Match not finished (PENDING)
+- Provider disagreement (INSUFFICIENT_DATA)
+- Null canonical state
+- No agent outputs
+- Two agents only
+- Evidence aggregation
+- Reasoning text generation
+- Canonical state propagation
 
 ## Tech Stack
 
@@ -174,8 +184,8 @@ Unit tests cover the consensus engine with 18 test cases:
 - **TypeScript** — Full type safety across all layers
 - **Tailwind CSS** — Dark theme, functional design
 - **@modelcontextprotocol/sdk** — MCP Server with StdioServerTransport
-- **Groq SDK** — llama3-8b-8192 for match predictions
-- **Axios** — Parallel API calls with retry and timeout
+- **Groq SDK** — llama3-8b-8192 for LLM Reasoning Agent
+- **Axios** — Parallel provider calls with retry and timeout
 - **lucide-react** — Icons
 - **Node.js test runner** — Built-in unit testing
 
@@ -184,26 +194,32 @@ Unit tests cover the consensus engine with 18 test cases:
 ```
 goalconsensus/
 ├── app/
-│   ├── page.tsx                  # Main dashboard
+│   ├── page.tsx                  # Dashboard with architecture sidebar
 │   ├── layout.tsx                # Root layout
 │   ├── globals.css               # Tailwind base
 │   └── api/
-│       ├── matches/route.ts      # GET — live matches with consensus
-│       ├── predict/route.ts      # POST — Groq AI prediction
-│       └── consensus/route.ts    # POST — BFT consensus engine
+│       ├── matches/route.ts      # GET — matches with agent consensus
+│       ├── predict/route.ts      # POST — individual agent predictions
+│       └── consensus/route.ts    # POST — full consensus with settlement
 ├── lib/
-│   ├── providers.ts              # Provider interface, registry, fetch logic
-│   ├── sources.ts                # Re-exports from providers
-│   ├── consensus.ts              # BFT consensus engine (dynamic n)
-│   ├── groq.ts                   # Groq SDK client
+│   ├── providers.ts              # 2 data providers + canonical state builder
+│   ├── sources.ts                # Re-exports
+│   ├── consensus.ts              # Agent-based Byzantine voting
+│   ├── groq.ts                   # Groq SDK utility (used by LLM agent)
 │   ├── x402.ts                   # x402 payment simulation
+│   ├── agents/
+│   │   ├── types.ts              # Agent interfaces and types
+│   │   ├── index.ts              # Agent registry
+│   │   ├── statistical-agent.ts  # Poisson model + Monte Carlo
+│   │   ├── llm-reasoning-agent.ts # Groq-based reasoning
+│   │   └── deterministic-rules-agent.ts # Rule-based validation
 │   └── __tests__/
-│       └── consensus.test.ts     # 18 unit tests for consensus
+│       └── consensus.test.ts     # 18 unit tests
 ├── mcp-server/
-│   └── index.ts                  # MCP Server (4 tools)
+│   └── index.ts                  # MCP Server v2.0 (4 tools)
 ├── components/
-│   ├── MatchCard.tsx             # Match card with consensus badge
-│   ├── ConsensusIndicator.tsx    # Visual provider status display
+│   ├── MatchCard.tsx             # Match card with agent details + evidence
+│   ├── ConsensusIndicator.tsx    # Agent voting visualization
 │   └── LiveDashboard.tsx         # Auto-refreshing match grid + provider health
 ├── package.json
 ├── tsconfig.json

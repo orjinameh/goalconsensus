@@ -1,432 +1,211 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { computeConsensus } from "../consensus";
-import { ProviderResult, ProviderHealth } from "../providers";
+import { computeAgentConsensus } from "../consensus";
+import { AgentOutput, CanonicalMatchState, AgentEvidence } from "../agents/types";
 
-function healthyHealth(id: string): ProviderHealth {
-  return {
-    providerId: id,
-    available: true,
-    latencyMs: 120,
-    lastChecked: new Date().toISOString(),
-  };
+function makeEvidence(source: string, detail: string): AgentEvidence {
+  return { source, detail, weight: 0.5 };
 }
 
-function downHealth(id: string, error = "timeout"): ProviderHealth {
-  return {
-    providerId: id,
-    available: false,
-    latencyMs: 8000,
-    lastChecked: new Date().toISOString(),
-    error,
-  };
-}
-
-function providerResult(
+function makeAgent(
   id: string,
-  matches: ProviderResult["matches"],
-  available = true
-): ProviderResult {
+  winner: string,
+  homeScore: number | null,
+  awayScore: number | null,
+  confidence: number
+): AgentOutput {
   return {
-    providerId: id,
-    matches,
-    health: available ? healthyHealth(id) : downHealth(id),
+    agentId: id,
+    agentName: `${id} Agent`,
+    prediction: { winner, homeScore, awayScore },
+    confidence,
+    explanation: `${id} predicts ${winner}`,
+    evidence: [makeEvidence(id, `predicts ${winner}`)],
+    timestamp: new Date().toISOString(),
+    latencyMs: 50,
   };
 }
 
-function match(
-  id: string,
-  home: string,
-  away: string,
-  hs: number | null,
-  as: number | null,
-  status: "SCHEDULED" | "LIVE" | "FINISHED",
-  providerId: string
-) {
+function makeCanonical(
+  overrides: Partial<CanonicalMatchState> = {}
+): CanonicalMatchState {
   return {
-    id,
-    homeTeam: home,
-    awayTeam: away,
-    homeScore: hs,
-    awayScore: as,
-    status,
-    matchDate: "2026-07-04T20:00:00Z",
-    providerId,
+    homeTeam: "Argentina",
+    awayTeam: "France",
+    homeScore: 2,
+    awayScore: 1,
+    status: "FINISHED",
+    matchDate: new Date().toISOString(),
+    providerAgreement: true,
+    providerCount: 2,
+    providerHealth: [],
+    rawResults: [],
+    ...overrides,
   };
 }
 
-const ARG = "Argentina";
-const FRA = "France";
-
-describe("computeConsensus", () => {
-  describe("one provider responding", () => {
-    it("returns INSUFFICIENT_DATA with only one provider", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [], false),
-        providerResult("api-football", [], false),
+describe("computeAgentConsensus", () => {
+  describe("null canonical state", () => {
+    it("returns INSUFFICIENT_DATA", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
       ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "INSUFFICIENT_DATA");
-      assert.equal(v.totalNodes, 1);
-      assert.equal(v.passingNodes, 0);
-      assert.equal(v.confidence, 0);
-      assert.equal(v.agreedResult, null);
-      assert.equal(v.providerHealth.length, 3);
-      assert.equal(v.providerHealth[0].available, true);
-      assert.equal(v.providerHealth[1].available, false);
-      assert.equal(v.providerHealth[2].available, false);
+      const result = computeAgentConsensus(agents, null);
+      assert.equal(result.settlementDecision, "INSUFFICIENT_DATA");
+      assert.equal(result.confidence, 0);
     });
   });
 
-  describe("two agreeing providers", () => {
-    it("returns CONFIRMED when both agree", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 2, 1, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [], false),
-      ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "CONFIRMED");
-      assert.equal(v.totalNodes, 2);
-      assert.equal(v.passingNodes, 2);
-      assert.equal(v.confidence, 100);
-      assert.deepEqual(v.agreedResult, {
-        homeTeam: ARG,
-        awayTeam: FRA,
-        homeScore: 2,
-        awayScore: 1,
-      });
-      assert.equal(v.conflictingProviders.length, 0);
+  describe("no agent outputs", () => {
+    it("returns INSUFFICIENT_DATA", () => {
+      const result = computeAgentConsensus([], makeCanonical());
+      assert.equal(result.settlementDecision, "INSUFFICIENT_DATA");
+      assert.equal(result.totalAgents, 0);
     });
   });
 
-  describe("two disagreeing providers", () => {
-    it("returns DISPUTED when both disagree", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 1, 1, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [], false),
+  describe("three agreeing agents", () => {
+    it("returns SETTLE with high confidence", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
       ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "DISPUTED");
-      assert.equal(v.totalNodes, 2);
-      assert.equal(v.passingNodes, 1);
-      assert.equal(v.confidence, 0);
-      assert.notEqual(v.agreedResult, null);
-      assert.ok(v.conflictingProviders.includes("thesportsdb"));
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.equal(result.settlementDecision, "SETTLE");
+      assert.equal(result.agreement, 3);
+      assert.equal(result.totalAgents, 3);
+      assert.equal(result.confidence, 100);
+      assert.equal(result.minorityOpinion, null);
+      assert.equal(result.finalPrediction.winner, "Argentina");
     });
   });
 
-  describe("three agreeing providers", () => {
-    it("returns CONFIRMED with 100% confidence", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 2, 1, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [
-          match("af-1", ARG, FRA, 2, 1, "FINISHED", "api-football"),
-        ]),
+  describe("two agreeing, one disagreeing", () => {
+    it("returns SETTLE with 67% confidence and minority opinion", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "France", 1, 2, 60),
       ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "CONFIRMED");
-      assert.equal(v.totalNodes, 3);
-      assert.equal(v.passingNodes, 3);
-      assert.equal(v.confidence, 100);
-      assert.deepEqual(v.agreedResult, {
-        homeTeam: ARG,
-        awayTeam: FRA,
-        homeScore: 2,
-        awayScore: 1,
-      });
-      assert.equal(v.conflictingProviders.length, 0);
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.equal(result.settlementDecision, "SETTLE");
+      assert.equal(result.agreement, 2);
+      assert.equal(result.confidence, 67);
+      assert.notEqual(result.minorityOpinion, null);
+      assert.equal(result.minorityOpinion!.agentId, "deterministic-rules");
     });
   });
 
-  describe("three providers, two agree one disagrees", () => {
-    it("returns CONFIRMED with 67% confidence", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 2, 1, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [
-          match("af-1", ARG, FRA, 1, 1, "FINISHED", "api-football"),
-        ]),
+  describe("all three disagree", () => {
+    it("returns DO_NOT_SETTLE", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 40),
+        makeAgent("llm-reasoning", "France", 1, 2, 45),
+        makeAgent("deterministic-rules", "Draw", 1, 1, 35),
       ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "CONFIRMED");
-      assert.equal(v.totalNodes, 3);
-      assert.equal(v.passingNodes, 2);
-      assert.equal(v.confidence, 67);
-      assert.ok(v.conflictingProviders.includes("api-football"));
-    });
-  });
-
-  describe("provider timeouts (unavailable)", () => {
-    it("returns INSUFFICIENT_DATA when all providers timeout", () => {
-      const results = [
-        providerResult("football-data", [], false),
-        providerResult("thesportsdb", [], false),
-        providerResult("api-football", [], false),
-      ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "INSUFFICIENT_DATA");
-      assert.equal(v.totalNodes, 0);
-      assert.equal(v.passingNodes, 0);
-      assert.equal(v.confidence, 0);
-      assert.equal(v.agreedResult, null);
-    });
-
-    it("returns INSUFFICIENT_DATA when two of three timeout", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [], false),
-        providerResult("api-football", [], false),
-      ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "INSUFFICIENT_DATA");
-      assert.equal(v.totalNodes, 1);
-      assert.equal(v.passingNodes, 0);
-      assert.equal(v.providerHealth.filter((h) => !h.available).length, 2);
-    });
-
-    it("uses data from available providers when one is down", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 2, 1, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [], false),
-      ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "CONFIRMED");
-      assert.equal(v.totalNodes, 2);
-      assert.equal(v.passingNodes, 2);
-      assert.equal(v.confidence, 100);
-    });
-  });
-
-  describe("no results at all", () => {
-    it("returns INSUFFICIENT_DATA when no matches returned", () => {
-      const results = [
-        providerResult("football-data", []),
-        providerResult("thesportsdb", []),
-        providerResult("api-football", []),
-      ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "INSUFFICIENT_DATA");
-      assert.ok(v.explanation.includes("No match data"));
-    });
-  });
-
-  describe("no results with some providers down", () => {
-    it("returns INSUFFICIENT_DATA when down providers return nothing and up providers also return nothing", () => {
-      const results = [
-        providerResult("football-data", []),
-        providerResult("thesportsdb", [], false),
-        providerResult("api-football", []),
-      ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "INSUFFICIENT_DATA");
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.equal(result.settlementDecision, "DO_NOT_SETTLE");
+      assert.equal(result.agreement, 1);
+      assert.equal(result.confidence, 33);
     });
   });
 
   describe("match not finished", () => {
-    it("returns PENDING when match is not finished", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, null, null, "SCHEDULED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, null, null, "SCHEDULED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [
-          match("af-1", ARG, FRA, null, null, "SCHEDULED", "api-football"),
-        ]),
+    it("returns PENDING regardless of agreement", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", null, null, 60),
+        makeAgent("llm-reasoning", "Argentina", null, null, 55),
+        makeAgent("deterministic-rules", "Argentina", null, null, 70),
       ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "PENDING");
-      assert.equal(v.confidence, 0);
-      assert.equal(v.agreedResult?.homeTeam, ARG);
+      const result = computeAgentConsensus(
+        agents,
+        makeCanonical({ status: "SCHEDULED", homeScore: null, awayScore: null })
+      );
+      assert.equal(result.settlementDecision, "PENDING");
     });
   });
 
-  describe("LIVE matches only", () => {
-    it("returns PENDING when only live matches", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 1, 0, "LIVE", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 1, 0, "LIVE", "thesportsdb"),
-        ]),
-        providerResult("api-football", [
-          match("af-1", ARG, FRA, 1, 0, "LIVE", "api-football"),
-        ]),
+  describe("provider disagreement", () => {
+    it("returns INSUFFICIENT_DATA when providers disagree", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
       ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "PENDING");
-      assert.equal(v.totalNodes, 3);
+      const result = computeAgentConsensus(
+        agents,
+        makeCanonical({ providerAgreement: false })
+      );
+      assert.equal(result.settlementDecision, "INSUFFICIENT_DATA");
     });
   });
 
-  describe("confidence calculation", () => {
-    it("computes confidence as agree/total * 100, rounded", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 3, 0, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 3, 0, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [
-          match("af-1", ARG, FRA, 2, 1, "FINISHED", "api-football"),
-        ]),
+  describe("evidence aggregation", () => {
+    it("collects all evidence from all agents", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
       ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "CONFIRMED");
-      assert.equal(v.confidence, 67);
-      assert.equal(v.passingNodes, 2);
-      assert.equal(v.totalNodes, 3);
-    });
-
-    it("computes confidence for two providers as 100 when both agree", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 1, 0, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 1, 0, "FINISHED", "thesportsdb"),
-        ]),
-      ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.confidence, 100);
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.equal(result.evidence.length, 3);
     });
   });
 
-  describe("provider health in verdict", () => {
-    it("includes provider health for all providers in verdict", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 2, 1, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [], false),
+  describe("reasoning text", () => {
+    it("includes agent summaries", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
       ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.providerHealth.length, 3);
-      assert.equal(v.providerHealth[0].providerId, "football-data");
-      assert.equal(v.providerHealth[0].available, true);
-      assert.equal(v.providerHealth[1].providerId, "thesportsdb");
-      assert.equal(v.providerHealth[1].available, true);
-      assert.equal(v.providerHealth[2].providerId, "api-football");
-      assert.equal(v.providerHealth[2].available, false);
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.ok(result.reasoning.includes("3/3 agents agree"));
+      assert.ok(result.reasoning.includes("statistical Agent"));
+      assert.ok(result.reasoning.includes("llm-reasoning Agent"));
+      assert.ok(result.reasoning.includes("deterministic-rules Agent"));
     });
   });
 
-  describe("BFT threshold calculation", () => {
-    it("threshold is ceil(2n/3) for dynamic n", () => {
-      const results2 = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 2, 1, "FINISHED", "thesportsdb"),
-        ]),
+  describe("canonical state propagation", () => {
+    it("includes canonical state in result", () => {
+      const canonical = makeCanonical();
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
       ];
-      const v2 = computeConsensus(results2);
-      assert.equal(v2.totalNodes, 2);
-      assert.equal(v2.verdict, "CONFIRMED");
-
-      const results3 = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 2, 1, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [
-          match("af-1", ARG, FRA, 2, 1, "FINISHED", "api-football"),
-        ]),
-      ];
-      const v3 = computeConsensus(results3);
-      assert.equal(v3.totalNodes, 3);
-      assert.equal(v3.verdict, "CONFIRMED");
-    });
-
-    it("two disagreeing with three total results in DISPUTED", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 0, 0, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [
-          match("af-1", ARG, FRA, 1, 1, "FINISHED", "api-football"),
-        ]),
-      ];
-
-      const v = computeConsensus(results);
-      assert.equal(v.verdict, "DISPUTED");
-      assert.equal(v.confidence, 0);
+      const result = computeAgentConsensus(agents, canonical);
+      assert.equal(result.canonicalState.homeTeam, "Argentina");
+      assert.equal(result.canonicalState.awayTeam, "France");
+      assert.equal(result.canonicalState.status, "FINISHED");
     });
   });
 
-  describe("no simulated data references", () => {
-    it("verdict never mentions simulated sources", () => {
-      const results = [
-        providerResult("football-data", [
-          match("fd-1", ARG, FRA, 2, 1, "FINISHED", "football-data"),
-        ]),
-        providerResult("thesportsdb", [
-          match("tsdb-1", ARG, FRA, 2, 1, "FINISHED", "thesportsdb"),
-        ]),
-        providerResult("api-football", [
-          match("af-1", ARG, FRA, 2, 1, "FINISHED", "api-football"),
-        ]),
+  describe("two agents only", () => {
+    it("returns SETTLE when both agree", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
       ];
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.equal(result.settlementDecision, "SETTLE");
+      assert.equal(result.agreement, 2);
+      assert.equal(result.confidence, 100);
+    });
 
-      const v = computeConsensus(results);
-      assert.ok(!v.explanation.toLowerCase().includes("simulated"));
-      assert.equal(v.conflictingProviders.length, 0);
+    it("returns DO_NOT_SETTLE when they disagree", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "France", 1, 2, 65),
+      ];
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.equal(result.settlementDecision, "DO_NOT_SETTLE");
+      assert.equal(result.agreement, 1);
+      assert.equal(result.confidence, 50);
     });
   });
 });

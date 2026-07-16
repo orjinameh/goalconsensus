@@ -1,27 +1,26 @@
 import { NextResponse } from "next/server";
 import { fetchAllProviders, MatchResult } from "@/lib/providers";
-import { computeConsensus } from "@/lib/consensus";
+import { agents } from "@/lib/agents";
+import { CanonicalMatchState } from "@/lib/agents/types";
+import { computeAgentConsensus, ConsensusResult } from "@/lib/consensus";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 interface EnrichedMatch extends MatchResult {
-  consensus: ReturnType<typeof computeConsensus>;
+  consensus: ConsensusResult;
 }
 
 function dedupeMatches(matches: MatchResult[]): MatchResult[] {
   const seen = new Map<string, MatchResult>();
   for (const m of matches) {
     const key = `${m.homeTeam.toLowerCase()}-${m.awayTeam.toLowerCase()}-${m.status}`;
-    if (!seen.has(key)) {
-      seen.set(key, m);
-    }
+    if (!seen.has(key)) seen.set(key, m);
   }
   return Array.from(seen.values());
 }
 
 export async function GET() {
   const providerResults = await fetchAllProviders();
-
   const allMatches = providerResults.flatMap((pr) => pr.matches);
   const combined = dedupeMatches(allMatches);
 
@@ -34,23 +33,34 @@ export async function GET() {
 
   const enriched: EnrichedMatch[] = [];
   for (const [, group] of grouped) {
-    const matchProviderResults = providerResults.map((pr) => ({
-      ...pr,
-      matches: pr.matches.filter(
-        (m) =>
-          m.homeTeam.toLowerCase() === group[0].homeTeam.toLowerCase() &&
-          m.awayTeam.toLowerCase() === group[0].awayTeam.toLowerCase()
-      ),
-    }));
-    const verdict = computeConsensus(matchProviderResults);
-    enriched.push({ ...group[0], consensus: verdict });
-  }
+    const first = group[0];
+    const responding = providerResults.filter((pr) => pr.health.available);
+    const providerAgreement = responding.length >= 2;
 
-  const providerHealth = providerResults.map((pr) => pr.health);
+    const canonicalState: CanonicalMatchState = {
+      homeTeam: first.homeTeam,
+      awayTeam: first.awayTeam,
+      homeScore: first.homeScore,
+      awayScore: first.awayScore,
+      status: first.status,
+      matchDate: first.matchDate,
+      providerAgreement,
+      providerCount: responding.length,
+      providerHealth: providerResults.map((pr) => pr.health),
+      rawResults: group,
+    };
+
+    const agentOutputs = await Promise.all(
+      agents.map((agent) => agent.verify(canonicalState))
+    );
+
+    const consensus = computeAgentConsensus(agentOutputs, canonicalState);
+    enriched.push({ ...first, consensus });
+  }
 
   return NextResponse.json({
     matches: enriched,
-    providerHealth,
+    providerHealth: providerResults.map((pr) => pr.health),
     fetchedAt: new Date().toISOString(),
   });
 }

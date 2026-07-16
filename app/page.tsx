@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { LiveDashboard } from "@/components/LiveDashboard";
-import { Shield, Cpu, CreditCard, ExternalLink } from "lucide-react";
+import { Shield, Cpu, CreditCard, ExternalLink, Brain, BarChart3, Scale } from "lucide-react";
 
 export default function Home() {
   const [paymentCount, setPaymentCount] = useState(0);
@@ -29,7 +29,7 @@ export default function Home() {
                 GoalConsensus
               </h1>
               <p className="text-xs text-gray-500">
-                BFT-Verified World Cup Oracle
+                Multi-Agent Settlement Verification
               </p>
             </div>
           </div>
@@ -43,15 +43,15 @@ export default function Home() {
       <div className="flex-1 flex max-w-7xl mx-auto w-full px-6 py-6 gap-6">
         <main className="flex-1">
           <p className="text-sm text-gray-400 mb-6">
-            Byzantine Fault Tolerant consensus across independent data providers.
-            Only verified providers contribute to consensus — no simulated data.
+            Canonical match state from 2 independent providers, verified by 3 analysis agents
+            with Byzantine-inspired consensus. No simulated data.
           </p>
           <LiveDashboard />
         </main>
 
         <aside className="w-72 shrink-0">
           <div className="bg-[#111] border border-white/10 rounded-lg p-4 space-y-4">
-            <h2 className="text-sm font-medium text-white">System Status</h2>
+            <h2 className="text-sm font-medium text-white">System Architecture</h2>
 
             <div className="space-y-3">
               <div className="flex items-center gap-3">
@@ -59,7 +59,7 @@ export default function Home() {
                 <div>
                   <div className="text-xs text-gray-400">MCP Server</div>
                   <div className="text-xs text-white font-mono">
-                    goalconsensus-mcp v1.0.0
+                    goalconsensus-mcp v2.0.0
                   </div>
                 </div>
               </div>
@@ -77,30 +77,45 @@ export default function Home() {
               </div>
 
               <div className="border-t border-white/5 pt-3">
-                <div className="text-xs text-gray-400 mb-2">
-                  BFT Parameters
+                <div className="text-xs text-gray-400 mb-2">Data Providers</div>
+                <div className="text-xs text-gray-500 space-y-0.5">
+                  <div>1. football-data.org</div>
+                  <div>2. thesportsdb.com</div>
                 </div>
-                <div className="text-xs font-mono text-gray-500 space-y-0.5">
-                  <div>n = dynamic (responding providers)</div>
-                  <div>f = floor((n-1)/3)</div>
-                  <div>threshold = ceil(2n/3)</div>
-                  <div>min providers = 2</div>
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Establish canonical match state. 2+ providers required.
+                </p>
+              </div>
+
+              <div className="border-t border-white/5 pt-3">
+                <div className="text-xs text-gray-400 mb-2">
+                  Verification Agents
+                </div>
+                <div className="text-xs text-gray-500 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 size={10} className="text-blue-400" />
+                    <span>Statistical (Poisson model)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Brain size={10} className="text-purple-400" />
+                    <span>LLM Reasoning (Groq)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Scale size={10} className="text-orange-400" />
+                    <span>Deterministic Rules</span>
+                  </div>
                 </div>
               </div>
 
               <div className="border-t border-white/5 pt-3">
                 <div className="text-xs text-gray-400 mb-2">
-                  Data Providers
+                  BFT Consensus
                 </div>
-                <div className="text-xs text-gray-500 space-y-0.5">
-                  <div>1. football-data.org</div>
-                  <div>2. thesportsdb.com</div>
-                  <div>3. api-football (RapidAPI)</div>
+                <div className="text-xs font-mono text-gray-500 space-y-0.5">
+                  <div>n = 3 (verification agents)</div>
+                  <div>threshold = ceil(2n/3) = 2</div>
+                  <div>majority vote determines settlement</div>
                 </div>
-                <p className="text-[10px] text-gray-600 mt-1">
-                  Consensus requires 2+ providers to agree. Unavailable
-                  providers are excluded — never simulated.
-                </p>
               </div>
 
               <div className="border-t border-white/5 pt-3">

@@ -2,68 +2,53 @@
 
 import { useState } from "react";
 import { MatchResult } from "@/lib/providers";
-import { ConsensusVerdict } from "@/lib/consensus";
+import { ConsensusResult } from "@/lib/consensus";
 import { X402Receipt } from "@/lib/x402";
 import { ConsensusIndicator } from "./ConsensusIndicator";
-import { Zap, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Zap,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertTriangle,
+} from "lucide-react";
 
 interface Props {
-  match: MatchResult & { consensus: ConsensusVerdict };
+  match: MatchResult & { consensus: ConsensusResult };
 }
 
 const verdictColors: Record<string, string> = {
-  CONFIRMED: "bg-green-500/20 text-green-400 border-green-500/30",
-  DISPUTED: "bg-red-500/20 text-red-400 border-red-500/30",
+  SETTLE: "bg-green-500/20 text-green-400 border-green-500/30",
+  DO_NOT_SETTLE: "bg-red-500/20 text-red-400 border-red-500/30",
   PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   INSUFFICIENT_DATA: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
-export function MatchCard({ match }: Props) {
-  const [prediction, setPrediction] = useState<{
-    predictedWinner: string;
-    winProbability: number;
-    keyFactors: string[];
-    predictedScore: string;
-    confidence: string;
-  } | null>(null);
-  const [payment, setPayment] = useState<X402Receipt | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+const verdictIcons: Record<string, typeof CheckCircle> = {
+  SETTLE: CheckCircle,
+  DO_NOT_SETTLE: XCircle,
+  PENDING: Clock,
+  INSUFFICIENT_DATA: AlertTriangle,
+};
 
-  const handlePredict = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          homeTeam: match.homeTeam,
-          awayTeam: match.awayTeam,
-        }),
-      });
-      const data = await res.json();
-      setPrediction(data.prediction);
-      setPayment(data.payment);
-      const current = parseInt(
-        localStorage.getItem("x402-payment-count") || "0",
-        10
-      );
-      localStorage.setItem("x402-payment-count", String(current + 1));
-    } catch {
-      setPrediction(null);
-    }
-    setLoading(false);
-  };
+export function MatchCard({ match }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
 
   const v = match.consensus;
+  const VerdictIcon = verdictIcons[v.settlementDecision] || Clock;
 
   return (
     <div className="bg-[#111] border border-white/10 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <span
-          className={`text-xs font-mono px-2 py-0.5 rounded border ${verdictColors[v.verdict] || verdictColors.PENDING}`}
+          className={`text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${verdictColors[v.settlementDecision] || verdictColors.PENDING}`}
         >
-          {v.verdict}
+          <VerdictIcon size={10} />
+          {v.settlementDecision}
         </span>
         {match.status === "LIVE" && (
           <span className="text-xs text-red-400 flex items-center gap-1">
@@ -95,24 +80,22 @@ export function MatchCard({ match }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex-1">
-          <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-            <span>Confidence</span>
-            <span>{v.confidence}%</span>
-          </div>
-          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${
-                v.confidence >= 66
-                  ? "bg-green-500"
-                  : v.confidence >= 33
-                    ? "bg-yellow-500"
-                    : "bg-gray-500"
-              }`}
-              style={{ width: `${v.confidence}%` }}
-            />
-          </div>
+      <div className="mb-3">
+        <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+          <span>Consensus Confidence</span>
+          <span>{v.confidence}%</span>
+        </div>
+        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${
+              v.confidence >= 66
+                ? "bg-green-500"
+                : v.confidence >= 33
+                  ? "bg-yellow-500"
+                  : "bg-gray-500"
+            }`}
+            style={{ width: `${v.confidence}%` }}
+          />
         </div>
       </div>
 
@@ -120,53 +103,68 @@ export function MatchCard({ match }: Props) {
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-300 transition-colors mb-2"
       >
-        <span>Provider details</span>
+        <span>Agent Consensus</span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
 
       {expanded && (
-        <div className="mb-3">
-          <ConsensusIndicator verdict={v} />
-          <p className="text-xs text-gray-400 mt-2">{v.explanation}</p>
+        <div className="mb-3 space-y-3">
+          <ConsensusIndicator consensus={v} />
+
+          <div className="space-y-2">
+            {v.agents.map((agent) => (
+              <div
+                key={agent.agentId}
+                className="p-2 bg-white/5 rounded border border-white/5"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-white font-medium">
+                    {agent.agentName}
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-mono">
+                    {agent.latencyMs}ms
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400">{agent.explanation}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-[10px] text-gray-500 font-mono px-2 py-1 bg-white/5 rounded">
+            {v.reasoning}
+          </div>
         </div>
       )}
 
       <button
-        onClick={handlePredict}
-        disabled={loading}
-        className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm py-2 rounded transition-colors disabled:opacity-50"
+        onClick={() => setShowEvidence(!showEvidence)}
+        className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-300 transition-colors mb-2"
       >
-        {loading ? (
-          <Loader2 size={14} className="animate-spin" />
-        ) : (
-          <Zap size={14} />
-        )}
-        {loading ? "Predicting..." : "AI Predict"}
+        <span>Evidence ({v.evidence.length} items)</span>
+        {showEvidence ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
 
-      {prediction && (
-        <div className="mt-3 p-3 bg-white/5 rounded border border-white/5">
-          <div className="text-xs text-gray-400 mb-1">Groq AI Prediction</div>
-          <div className="text-sm text-white">
-            <span className="font-medium">{prediction.predictedWinner}</span>{" "}
-            wins ({prediction.winProbability}%)
-          </div>
-          <div className="text-xs text-gray-400 mt-1">
-            Score: {prediction.predictedScore} | Confidence:{" "}
-            {prediction.confidence}
-          </div>
-          <div className="mt-2 space-y-0.5">
-            {prediction.keyFactors.map((f, i) => (
-              <div key={i} className="text-xs text-gray-500">
-                - {f}
-              </div>
-            ))}
-          </div>
-          {payment && (
-            <div className="mt-2 text-xs text-gray-600 font-mono">
-              x402: {payment.amount} | {payment.txHash.slice(0, 10)}...
+      {showEvidence && (
+        <div className="mb-3 space-y-1">
+          {v.evidence.map((e, i) => (
+            <div key={i} className="flex items-start gap-2 text-[10px]">
+              <span
+                className={`shrink-0 px-1 rounded ${
+                  e.source === "statistical"
+                    ? "bg-blue-500/20 text-blue-400"
+                    : e.source === "llm-reasoning"
+                      ? "bg-purple-500/20 text-purple-400"
+                      : "bg-orange-500/20 text-orange-400"
+                }`}
+              >
+                {e.source.split("-")[0]}
+              </span>
+              <span className="text-gray-400">{e.detail}</span>
+              <span className="text-gray-600 shrink-0">
+                w:{(e.weight * 100).toFixed(0)}%
+              </span>
             </div>
-          )}
+          ))}
         </div>
       )}
     </div>
