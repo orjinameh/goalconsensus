@@ -91,29 +91,52 @@ export const llmReasoningAgent: VerificationAgent = {
     try {
       const client = getClient();
       const model = getModelName();
-      const response = await client.chat.completions.create({
-        model,
-        temperature: 0.2,
-        max_tokens: 512,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a professional football analyst specializing in match prediction. Analyze match context and predict outcomes. Respond only in valid JSON with no markdown formatting.",
-          },
-          {
-            role: "user",
-            content: `Analyze this football match: ${state.homeTeam} vs ${state.awayTeam}.
+      const maxRetries = 3;
+      let lastError: unknown;
+
+      let response;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          response = await client.chat.completions.create({
+            model,
+            temperature: 0.2,
+            max_tokens: 512,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are a professional football analyst specializing in match prediction. Analyze match context and predict outcomes. Respond only in valid JSON with no markdown formatting.",
+              },
+              {
+                role: "user",
+                content: `Analyze this football match: ${state.homeTeam} vs ${state.awayTeam}.
 Status: ${state.status}
 ${state.homeScore !== null ? `Current score: ${state.homeTeam} ${state.homeScore} - ${state.awayScore} ${state.awayTeam}` : "Score not yet available."}
 
 Consider: recent form, venue advantage, head-to-head record, squad depth, tactical matchup, home advantage.
 Return JSON: { "winner": string, "homeScore": number, "awayScore": number, "confidence": number 0-100, "reasoning": string, "keyFactors": [3 strings] }`,
-          },
-        ],
-      });
+              },
+            ],
+          });
+          break;
+        } catch (err: any) {
+          lastError = err;
+          const status = err?.status || err?.code;
+          if (status === 429 && attempt < maxRetries) {
+            const retryAfter = parseFloat(
+              err?.headers?.["retry-after"] || "0"
+            ) || Math.pow(2, attempt + 1);
+            console.warn(
+              `[llm-reasoning] Rate limited, retrying in ${retryAfter.toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`
+            );
+            await new Promise((r) => setTimeout(r, retryAfter * 1000));
+            continue;
+          }
+          throw err;
+        }
+      }
 
-      const content = response.choices[0]?.message?.content || "{}";
+      const content = response!.choices[0]?.message?.content || "{}";
       const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
       const parsed = JSON.parse(cleaned) as LLMResponse;
 
