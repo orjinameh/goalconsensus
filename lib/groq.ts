@@ -18,7 +18,7 @@ function getClient(): Groq {
 }
 
 function getModelName(): string {
-  return process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+  return process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 }
 
 export async function predictMatch(

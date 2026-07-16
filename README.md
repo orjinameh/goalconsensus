@@ -49,7 +49,7 @@ Three independent verification agents analyze the canonical state:
 
 #### 2. LLM Reasoning Agent
 - Uses Groq with configurable model (`GROQ_MODEL` env var)
-- Defaults to `openai/gpt-oss-20b`
+- Defaults to `llama-3.3-70b-versatile`
 - Reasons about form, venue advantage, historical matchups, squad depth, tactical matchup
 - Produces structured JSON with prediction, confidence, and key factors
 - Gracefully falls back when API unavailable — logs real error server-side, shows clean message to user
@@ -123,7 +123,7 @@ cp .env.example .env
 # Configure:
 #   FOOTBALL_DATA_API_KEY — https://www.football-data.org/client/register
 #   GROQ_API_KEY — optional, for LLM Reasoning Agent
-#   GROQ_MODEL — optional, defaults to openai/gpt-oss-20b
+#   GROQ_MODEL — optional, defaults to llama-3.3-70b-versatile
 ```
 
 ## Running
@@ -145,7 +145,7 @@ npm test         # Unit tests (22 test cases)
       "env": {
         "FOOTBALL_DATA_API_KEY": "",
         "GROQ_API_KEY": "",
-        "GROQ_MODEL": "openai/gpt-oss-20b"
+        "GROQ_MODEL": "llama-3.3-70b-versatile"
       }
     }
   }
