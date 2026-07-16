@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "mcp": "tsx mcp-server/index.ts"
+    "mcp": "tsx mcp-server/index.ts",
+    "test": "tsx --test lib/__tests__/*.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

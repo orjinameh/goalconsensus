@@ -1,3 +1,5 @@
+import { MatchResult, ProviderHealth, ProviderResult } from "./providers";
+
 export type ConsensusVerdict = {
   verdict: "CONFIRMED" | "DISPUTED" | "PENDING" | "INSUFFICIENT_DATA";
   confidence: number;
@@ -7,80 +9,91 @@ export type ConsensusVerdict = {
     homeScore: number | null;
     awayScore: number | null;
   } | null;
-  conflictingSources: string[];
+  conflictingProviders: string[];
   passingNodes: number;
   totalNodes: number;
   explanation: string;
+  providerHealth: ProviderHealth[];
 };
-
-import { MatchResult } from "./sources";
 
 function resultKey(m: MatchResult): string {
   return `${m.homeScore ?? "x"}-${m.awayScore ?? "x"}`;
 }
 
-function hasSimulatedSource(results: MatchResult[]): boolean {
-  return results.some((r) => r.source === "simulated");
-}
+export function computeConsensus(
+  providerResults: ProviderResult[]
+): ConsensusVerdict {
+  const providerHealth = providerResults.map((pr) => pr.health);
+  const responding = providerResults.filter((pr) => pr.health.available);
 
-export function computeConsensus(results: MatchResult[]): ConsensusVerdict {
-  const totalNodes = 3;
+  if (responding.length < 2) {
+    const names = responding.map((r) => r.providerId);
+    const down = providerResults
+      .filter((pr) => !pr.health.available)
+      .map((pr) => pr.providerId);
+    return {
+      verdict: "INSUFFICIENT_DATA",
+      confidence: 0,
+      agreedResult: null,
+      conflictingProviders: [],
+      passingNodes: 0,
+      totalNodes: responding.length,
+      explanation: `Only ${responding.length} provider(s) responded (${names.join(", ") || "none"}). Need at least 2. Unavailable: ${down.join(", ") || "none"}.`,
+      providerHealth,
+    };
+  }
+
+  const allMatches = responding.flatMap((pr) => pr.matches);
+
+  if (allMatches.length === 0) {
+    return {
+      verdict: "INSUFFICIENT_DATA",
+      confidence: 0,
+      agreedResult: null,
+      conflictingProviders: [],
+      passingNodes: 0,
+      totalNodes: responding.length,
+      explanation: "No match data returned by any responding provider.",
+      providerHealth,
+    };
+  }
+
+  const totalNodes = responding.length;
   const threshold = Math.ceil((2 * totalNodes) / 3);
 
-  if (results.length === 0) {
-    return {
-      verdict: "INSUFFICIENT_DATA",
-      confidence: 0,
-      agreedResult: null,
-      conflictingSources: [],
-      passingNodes: 0,
-      totalNodes,
-      explanation: "No data sources returned results.",
-    };
-  }
+  const finishedMatches = allMatches.filter((m) => m.status === "FINISHED");
 
-  const nonSimulated = results.filter((r) => r.source !== "simulated");
-
-  if (nonSimulated.length === 0) {
-    return {
-      verdict: "INSUFFICIENT_DATA",
-      confidence: 0,
-      agreedResult: null,
-      conflictingSources: results.map((r) => r.source),
-      passingNodes: 0,
-      totalNodes,
-      explanation:
-        "All sources are simulated/unverified. Cannot confirm consensus from unverified data.",
-    };
-  }
-
-  const firstFinished = nonSimulated.find((r) => r.status === "FINISHED");
-  if (!firstFinished) {
+  if (finishedMatches.length === 0) {
+    const first = allMatches[0];
     return {
       verdict: "PENDING",
-      confidence: 25,
+      confidence: 0,
       agreedResult: {
-        homeTeam: nonSimulated[0].homeTeam,
-        awayTeam: nonSimulated[0].awayTeam,
+        homeTeam: first.homeTeam,
+        awayTeam: first.awayTeam,
         homeScore: null,
         awayScore: null,
       },
-      conflictingSources: [],
+      conflictingProviders: [],
       passingNodes: 0,
       totalNodes,
       explanation: "Match has not finished yet. Awaiting final score.",
+      providerHealth,
     };
   }
 
+  const firstFinished = finishedMatches[0];
   const key = resultKey(firstFinished);
-  const agree = nonSimulated.filter((r) => resultKey(r) === key);
-  const disagree = nonSimulated.filter((r) => resultKey(r) !== key);
-  const simulateDisclaimer = results.some((r) => r.source === "simulated")
-    ? " Note: simulated source excluded from consensus."
-    : "";
+  const agree = finishedMatches.filter((m) => resultKey(m) === key);
+  const disagree = finishedMatches.filter((m) => resultKey(m) !== key);
 
-  if (agree.length >= threshold) {
-    const confidence = Math.round((agree.length / totalNodes) * 100);
+  const agreeProviders = [...new Set(agree.map((m) => m.providerId))];
+  const disagreeProviders = [...new Set(disagree.map((m) => m.providerId))];
+
+  if (agreeProviders.length >= threshold) {
+    const confidence = Math.round(
+      (agreeProviders.length / totalNodes) * 100
+    );
     return {
       verdict: "CONFIRMED",
       confidence,
@@ -90,14 +103,15 @@ export function computeConsensus(results: MatchResult[]): ConsensusVerdict {
         homeScore: firstFinished.homeScore,
         awayScore: firstFinished.awayScore,
       },
-      conflictingSources: disagree.map((r) => r.source),
-      passingNodes: agree.length,
+      conflictingProviders: disagreeProviders,
+      passingNodes: agreeProviders.length,
       totalNodes,
-      explanation: `${agree.length} of ${totalNodes} verified sources agree on ${firstFinished.homeTeam} ${firstFinished.homeScore} - ${firstFinished.awayScore} ${firstFinished.awayTeam}. BFT threshold (≥${threshold}) met.${simulateDisclaimer}`,
+      explanation: `${agreeProviders.length} of ${totalNodes} providers agree on ${firstFinished.homeTeam} ${firstFinished.homeScore} - ${firstFinished.awayScore} ${firstFinished.awayTeam}. BFT threshold (${threshold}/${totalNodes}) met.`,
+      providerHealth,
     };
   }
 
-  if (agree.length < threshold && nonSimulated.length >= threshold) {
+  if (agreeProviders.length < threshold && totalNodes >= threshold) {
     return {
       verdict: "DISPUTED",
       confidence: 0,
@@ -107,25 +121,30 @@ export function computeConsensus(results: MatchResult[]): ConsensusVerdict {
         homeScore: firstFinished.homeScore,
         awayScore: firstFinished.awayScore,
       },
-      conflictingSources: disagree.map((r) => r.source),
-      passingNodes: agree.length,
+      conflictingProviders: disagreeProviders,
+      passingNodes: agreeProviders.length,
       totalNodes,
-      explanation: `Only ${agree.length} of ${totalNodes} verified sources agree. BFT threshold (≥${threshold}) not met. Results are disputed.${simulateDisclaimer}`,
+      explanation: `Only ${agreeProviders.length} of ${totalNodes} providers agree. BFT threshold (${threshold}/${totalNodes}) not met. Results are disputed.`,
+      providerHealth,
     };
   }
 
+  const confidence = Math.round(
+    (agreeProviders.length / totalNodes) * 100
+  );
   return {
     verdict: "PENDING",
-    confidence: Math.round((agree.length / totalNodes) * 50),
+    confidence,
     agreedResult: {
       homeTeam: firstFinished.homeTeam,
       awayTeam: firstFinished.awayTeam,
       homeScore: firstFinished.homeScore,
       awayScore: firstFinished.awayScore,
     },
-    conflictingSources: disagree.map((r) => r.source),
-    passingNodes: agree.length,
+    conflictingProviders: disagreeProviders,
+    passingNodes: agreeProviders.length,
     totalNodes,
-    explanation: `Insufficient verified sources for consensus. ${agree.length} agree, need ≥${threshold}.${simulateDisclaimer}`,
+    explanation: `Insufficient provider agreement. ${agreeProviders.length} of ${totalNodes} agree, need >=${threshold}.`,
+    providerHealth,
   };
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchMatchesForPair } from "@/lib/sources";
+import { fetchMatchesForPair } from "@/lib/providers";
 import { computeConsensus } from "@/lib/consensus";
 import { chargeX402, formatX402Header } from "@/lib/x402";
 
@@ -13,19 +13,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const results = await fetchMatchesForPair(homeTeam, awayTeam);
-  const verdict = computeConsensus(results);
+  const providerResults = await fetchMatchesForPair(homeTeam, awayTeam);
+  const verdict = computeConsensus(providerResults);
 
   const queryId = `consensus-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const payment = chargeX402("get_consensus_result", queryId);
 
   return NextResponse.json({
     verdict,
-    sources: results.map((r) => ({
-      source: r.source,
-      homeScore: r.homeScore,
-      awayScore: r.awayScore,
-      status: r.status,
+    providerHealth: providerResults.map((pr) => pr.health),
+    sources: providerResults.map((pr) => ({
+      provider: pr.providerId,
+      matchCount: pr.matches.length,
+      scores: pr.matches.map((m) => ({
+        homeScore: m.homeScore,
+        awayScore: m.awayScore,
+        status: m.status,
+      })),
     })),
     payment,
     x402Header: formatX402Header(),

@@ -6,42 +6,57 @@ interface Props {
   verdict: ConsensusVerdict;
 }
 
-const sourceLabels = ["football-data", "thesportsdb", "simulated"];
-
 export function ConsensusIndicator({ verdict }: Props) {
+  const allProviderIds = verdict.providerHealth.map((h) => h.providerId);
+
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="flex items-center gap-2">
-        {sourceLabels.map((src) => {
-          const isConflicting = verdict.conflictingSources.includes(src);
-          const isSimulated = src === "simulated";
+        {verdict.providerHealth.map((h) => {
+          const isConflicting = verdict.conflictingProviders.includes(
+            h.providerId
+          );
           let color = "bg-gray-600";
-          if (verdict.verdict === "PENDING" || verdict.verdict === "INSUFFICIENT_DATA") {
+          if (
+            verdict.verdict === "PENDING" ||
+            verdict.verdict === "INSUFFICIENT_DATA"
+          ) {
             color = "bg-gray-600";
+          } else if (!h.available) {
+            color = "bg-red-500/50 border border-dashed border-red-400";
           } else if (isConflicting) {
             color = "bg-red-500";
-          } else if (isSimulated) {
-            color = "bg-gray-600 border border-dashed border-gray-400";
           } else {
             color = "bg-green-500";
           }
 
           return (
-            <div key={src} className="flex flex-col items-center gap-1">
+            <div key={h.providerId} className="flex flex-col items-center gap-1">
               <div
                 className={`w-8 h-8 rounded-full ${color} flex items-center justify-center text-xs font-mono text-white`}
+                title={
+                  h.available
+                    ? `${h.providerId} — ${h.latencyMs}ms`
+                    : `${h.providerId} — DOWN: ${h.error || "unavailable"}`
+                }
               >
-                {isSimulated ? "~" : src[0].toUpperCase()}
+                {!h.available ? "!" : h.providerId[0].toUpperCase()}
               </div>
-              <span className="text-[10px] text-gray-500 max-w-[60px] text-center truncate">
-                {src}
+              <span className="text-[10px] text-gray-500 max-w-[70px] text-center truncate">
+                {h.providerId}
               </span>
+              {h.available && (
+                <span className="text-[9px] text-gray-600">{h.latencyMs}ms</span>
+              )}
+              {!h.available && (
+                <span className="text-[9px] text-red-400">down</span>
+              )}
             </div>
           );
         })}
       </div>
       <div className="text-[10px] text-gray-500 font-mono">
-        n={verdict.totalNodes} f=1 threshold≥2 | passing={verdict.passingNodes}
+        n={verdict.totalNodes} threshold≥{Math.ceil((2 * verdict.totalNodes) / 3)} | passing={verdict.passingNodes}
       </div>
     </div>
   );

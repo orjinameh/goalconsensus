@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MatchResult } from "@/lib/sources";
+import { MatchResult } from "@/lib/providers";
 import { ConsensusVerdict } from "@/lib/consensus";
 import { X402Receipt } from "@/lib/x402";
 import { ConsensusIndicator } from "./ConsensusIndicator";
@@ -44,7 +44,10 @@ export function MatchCard({ match }: Props) {
       const data = await res.json();
       setPrediction(data.prediction);
       setPayment(data.payment);
-      const current = parseInt(localStorage.getItem("x402-payment-count") || "0", 10);
+      const current = parseInt(
+        localStorage.getItem("x402-payment-count") || "0",
+        10
+      );
       localStorage.setItem("x402-payment-count", String(current + 1));
     } catch {
       setPrediction(null);
@@ -117,7 +120,7 @@ export function MatchCard({ match }: Props) {
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-300 transition-colors mb-2"
       >
-        <span>Source details</span>
+        <span>Provider details</span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
 

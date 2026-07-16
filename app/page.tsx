@@ -43,8 +43,8 @@ export default function Home() {
       <div className="flex-1 flex max-w-7xl mx-auto w-full px-6 py-6 gap-6">
         <main className="flex-1">
           <p className="text-sm text-gray-400 mb-6">
-            Byzantine Fault Tolerant consensus across 3 independent sources.
-            Powered by Injective x402 and MCP.
+            Byzantine Fault Tolerant consensus across independent data providers.
+            Only verified providers contribute to consensus — no simulated data.
           </p>
           <LiveDashboard />
         </main>
@@ -71,27 +71,36 @@ export default function Home() {
                     x402 Payments (this session)
                   </div>
                   <div className="text-xs text-white font-mono">
-                    {paymentCount} queries × 0.001 USDC
+                    {paymentCount} queries x 0.001 USDC
                   </div>
                 </div>
               </div>
 
               <div className="border-t border-white/5 pt-3">
-                <div className="text-xs text-gray-400 mb-2">BFT Parameters</div>
+                <div className="text-xs text-gray-400 mb-2">
+                  BFT Parameters
+                </div>
                 <div className="text-xs font-mono text-gray-500 space-y-0.5">
-                  <div>n = 3 (total sources)</div>
-                  <div>f = 1 (faulty tolerated)</div>
-                  <div>threshold = 2/3</div>
+                  <div>n = dynamic (responding providers)</div>
+                  <div>f = floor((n-1)/3)</div>
+                  <div>threshold = ceil(2n/3)</div>
+                  <div>min providers = 2</div>
                 </div>
               </div>
 
               <div className="border-t border-white/5 pt-3">
-                <div className="text-xs text-gray-400 mb-2">Data Sources</div>
+                <div className="text-xs text-gray-400 mb-2">
+                  Data Providers
+                </div>
                 <div className="text-xs text-gray-500 space-y-0.5">
                   <div>1. football-data.org</div>
                   <div>2. thesportsdb.com</div>
-                  <div>3. simulated (fallback)</div>
+                  <div>3. api-football (RapidAPI)</div>
                 </div>
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Consensus requires 2+ providers to agree. Unavailable
+                  providers are excluded — never simulated.
+                </p>
               </div>
 
               <div className="border-t border-white/5 pt-3">

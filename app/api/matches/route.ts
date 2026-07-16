@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchAllSources, MatchResult } from "@/lib/sources";
+import { fetchAllProviders, MatchResult } from "@/lib/providers";
 import { computeConsensus } from "@/lib/consensus";
 
 export const revalidate = 60;
@@ -20,12 +20,10 @@ function dedupeMatches(matches: MatchResult[]): MatchResult[] {
 }
 
 export async function GET() {
-  const all = await fetchAllSources();
-  const combined = dedupeMatches([
-    ...all.footballData,
-    ...all.thesportsdb,
-    ...all.simulated,
-  ]);
+  const providerResults = await fetchAllProviders();
+
+  const allMatches = providerResults.flatMap((pr) => pr.matches);
+  const combined = dedupeMatches(allMatches);
 
   const grouped = new Map<string, MatchResult[]>();
   for (const m of combined) {
@@ -36,9 +34,23 @@ export async function GET() {
 
   const enriched: EnrichedMatch[] = [];
   for (const [, group] of grouped) {
-    const verdict = computeConsensus(group);
+    const matchProviderResults = providerResults.map((pr) => ({
+      ...pr,
+      matches: pr.matches.filter(
+        (m) =>
+          m.homeTeam.toLowerCase() === group[0].homeTeam.toLowerCase() &&
+          m.awayTeam.toLowerCase() === group[0].awayTeam.toLowerCase()
+      ),
+    }));
+    const verdict = computeConsensus(matchProviderResults);
     enriched.push({ ...group[0], consensus: verdict });
   }
 
-  return NextResponse.json({ matches: enriched, fetchedAt: new Date().toISOString() });
+  const providerHealth = providerResults.map((pr) => pr.health);
+
+  return NextResponse.json({
+    matches: enriched,
+    providerHealth,
+    fetchedAt: new Date().toISOString(),
+  });
 }
