@@ -1,7 +1,6 @@
 "use client";
 
 import { ConsensusResult } from "@/lib/consensus";
-import { AgentOutput } from "@/lib/agents/types";
 
 interface Props {
   consensus: ConsensusResult;
@@ -25,11 +24,24 @@ export function ConsensusIndicator({ consensus }: Props) {
       <div className="flex items-center gap-3 justify-center">
         {consensus.agents.map((agent) => {
           const agrees =
-            agent.prediction.winner === consensus.finalPrediction.winner;
+            agent.prediction.winner ===
+            consensus.finalPrediction.winner;
+          const isUnavailable =
+            agent.confidence === 0 &&
+            agent.agentId === "llm-reasoning";
           return (
-            <div key={agent.agentId} className="flex flex-col items-center gap-1">
+            <div
+              key={agent.agentId}
+              className="flex flex-col items-center gap-1"
+            >
               <div
-                className={`w-10 h-10 rounded-full ${agrees ? "bg-green-500" : "bg-red-500"} flex items-center justify-center text-sm font-mono text-white`}
+                className={`w-10 h-10 rounded-full ${
+                  isUnavailable
+                    ? "bg-gray-600"
+                    : agrees
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                } flex items-center justify-center text-sm font-mono text-white`}
                 title={`${agent.agentName}: ${agent.prediction.winner} (${agent.confidence}%)`}
               >
                 {agentIcons[agent.agentId] || "?"}
@@ -38,7 +50,7 @@ export function ConsensusIndicator({ consensus }: Props) {
                 {agent.agentName.split(" ")[0]}
               </span>
               <span className="text-[9px] text-gray-600">
-                {agent.confidence}%
+                {isUnavailable ? "N/A" : `${agent.confidence}%`}
               </span>
             </div>
           );

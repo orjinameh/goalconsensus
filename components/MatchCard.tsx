@@ -3,11 +3,8 @@
 import { useState } from "react";
 import { MatchResult } from "@/lib/providers";
 import { ConsensusResult } from "@/lib/consensus";
-import { X402Receipt } from "@/lib/x402";
 import { ConsensusIndicator } from "./ConsensusIndicator";
 import {
-  Zap,
-  Loader2,
   ChevronDown,
   ChevronUp,
   CheckCircle,
@@ -25,6 +22,7 @@ const verdictColors: Record<string, string> = {
   DO_NOT_SETTLE: "bg-red-500/20 text-red-400 border-red-500/30",
   PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   INSUFFICIENT_DATA: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  UNSUPPORTED_SPORT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
 const verdictIcons: Record<string, typeof CheckCircle> = {
@@ -32,6 +30,7 @@ const verdictIcons: Record<string, typeof CheckCircle> = {
   DO_NOT_SETTLE: XCircle,
   PENDING: Clock,
   INSUFFICIENT_DATA: AlertTriangle,
+  UNSUPPORTED_SPORT: AlertTriangle,
 };
 
 export function MatchCard({ match }: Props) {
@@ -40,6 +39,11 @@ export function MatchCard({ match }: Props) {
 
   const v = match.consensus;
   const VerdictIcon = verdictIcons[v.settlementDecision] || Clock;
+
+  const predictionLabel =
+    v.finalPrediction.winner === "Draw"
+      ? "Draw"
+      : v.finalPrediction.winner;
 
   return (
     <div className="bg-[#111] border border-white/10 rounded-lg p-4">
@@ -68,7 +72,9 @@ export function MatchCard({ match }: Props) {
 
       <div className="flex items-center justify-between mb-3">
         <div className="flex-1 text-right">
-          <span className="text-white font-medium">{match.homeTeam}</span>
+          <span className="text-white font-medium">
+            {match.homeTeam}
+          </span>
         </div>
         <div className="mx-4 font-mono text-xl text-white min-w-[80px] text-center">
           {match.homeScore !== null && match.awayScore !== null
@@ -76,26 +82,59 @@ export function MatchCard({ match }: Props) {
             : "vs"}
         </div>
         <div className="flex-1 text-left">
-          <span className="text-white font-medium">{match.awayTeam}</span>
+          <span className="text-white font-medium">
+            {match.awayTeam}
+          </span>
         </div>
       </div>
 
-      <div className="mb-3">
-        <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-          <span>Consensus Confidence</span>
-          <span>{v.confidence}%</span>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="bg-white/5 rounded p-2">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
+            Prediction
+          </div>
+          <div className="text-sm text-white font-medium truncate">
+            {predictionLabel}
+          </div>
         </div>
-        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${
-              v.confidence >= 66
-                ? "bg-green-500"
-                : v.confidence >= 33
-                  ? "bg-yellow-500"
-                  : "bg-gray-500"
-            }`}
-            style={{ width: `${v.confidence}%` }}
-          />
+        <div className="bg-white/5 rounded p-2">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
+            Confidence
+          </div>
+          <div className="text-sm text-white font-medium">
+            {v.confidence}%
+          </div>
+          <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden mt-1">
+            <div
+              className={`h-full rounded-full transition-all ${
+                v.confidence >= 66
+                  ? "bg-green-500"
+                  : v.confidence >= 33
+                    ? "bg-yellow-500"
+                    : "bg-gray-500"
+              }`}
+              style={{ width: `${v.confidence}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="bg-white/5 rounded p-2">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
+            Agreement
+          </div>
+          <div className="text-sm text-white font-medium">
+            {v.agreement} / {v.totalAgents}
+          </div>
+        </div>
+        <div className="bg-white/5 rounded p-2">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
+            Overall Confidence
+          </div>
+          <div className="text-sm text-white font-medium">
+            {v.confidence}%
+          </div>
         </div>
       </div>
 
@@ -125,7 +164,9 @@ export function MatchCard({ match }: Props) {
                     {agent.latencyMs}ms
                   </span>
                 </div>
-                <p className="text-[11px] text-gray-400">{agent.explanation}</p>
+                <p className="text-[11px] text-gray-400">
+                  {agent.explanation}
+                </p>
               </div>
             ))}
           </div>
@@ -141,13 +182,20 @@ export function MatchCard({ match }: Props) {
         className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-300 transition-colors mb-2"
       >
         <span>Evidence ({v.evidence.length} items)</span>
-        {showEvidence ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        {showEvidence ? (
+          <ChevronUp size={14} />
+        ) : (
+          <ChevronDown size={14} />
+        )}
       </button>
 
       {showEvidence && (
         <div className="mb-3 space-y-1">
           {v.evidence.map((e, i) => (
-            <div key={i} className="flex items-start gap-2 text-[10px]">
+            <div
+              key={i}
+              className="flex items-start gap-2 text-[10px]"
+            >
               <span
                 className={`shrink-0 px-1 rounded ${
                   e.source === "statistical"

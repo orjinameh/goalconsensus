@@ -1,4 +1,9 @@
-import { VerificationAgent, CanonicalMatchState, AgentOutput, AgentEvidence } from "./types";
+import {
+  VerificationAgent,
+  CanonicalMatchState,
+  AgentOutput,
+  AgentEvidence,
+} from "./types";
 
 interface RuleCheck {
   name: string;
@@ -15,27 +20,49 @@ export const deterministicRulesAgent: VerificationAgent = {
     const start = Date.now();
     const rules: RuleCheck[] = [];
 
+    if (state.sport !== "FOOTBALL") {
+      return {
+        agentId: "deterministic-rules",
+        agentName: "Deterministic Rules Agent",
+        prediction: { winner: "Unknown", homeScore: null, awayScore: null },
+        confidence: 0,
+        explanation: `UNSUPPORTED_SPORT: Deterministic Rules Agent only supports football. Received sport: ${state.sport}.`,
+        evidence: [
+          {
+            source: "deterministic-rules",
+            detail: `UNSUPPORTED_SPORT: ${state.sport}`,
+            weight: 1.0,
+          },
+        ],
+        timestamp: new Date().toISOString(),
+        latencyMs: Date.now() - start,
+      };
+    }
+
     rules.push({
       name: "provider_agreement",
       passed: state.providerCount >= 2,
-      detail: state.providerCount >= 2
-        ? `${state.providerCount} providers agree on match state`
-        : `Only ${state.providerCount} provider(s) available — need at least 2`,
+      detail:
+        state.providerCount >= 2
+          ? `${state.providerCount} providers agree on match state`
+          : `Only ${state.providerCount} provider(s) available — need at least 2`,
       weight: 0.3,
     });
 
     rules.push({
       name: "match_completed",
       passed: state.status === "FINISHED",
-      detail: state.status === "FINISHED"
-        ? "Match status is FINISHED — canonical score available"
-        : `Match status is ${state.status} — final score not yet confirmed`,
+      detail:
+        state.status === "FINISHED"
+          ? "Match status is FINISHED — canonical score available"
+          : `Match status is ${state.status} — final score not yet confirmed`,
       weight: 0.25,
     });
 
     const matchDate = new Date(state.matchDate);
     const now = new Date();
-    const hoursDiff = (now.getTime() - matchDate.getTime()) / (1000 * 60 * 60);
+    const hoursDiff =
+      (now.getTime() - matchDate.getTime()) / (1000 * 60 * 60);
     const timestampValid = hoursDiff >= -24 && hoursDiff <= 48;
     rules.push({
       name: "timestamp_validation",
@@ -46,9 +73,13 @@ export const deterministicRulesAgent: VerificationAgent = {
       weight: 0.15,
     });
 
-    const scoresExist = state.homeScore !== null && state.awayScore !== null;
+    const scoresExist =
+      state.homeScore !== null && state.awayScore !== null;
     const scoresPlausible = scoresExist
-      ? state.homeScore! >= 0 && state.awayScore! >= 0 && state.homeScore! <= 20 && state.awayScore! <= 20
+      ? state.homeScore! >= 0 &&
+        state.awayScore! >= 0 &&
+        state.homeScore! <= 20 &&
+        state.awayScore! <= 20
       : state.status !== "FINISHED";
     rules.push({
       name: "data_consistency",
@@ -63,25 +94,35 @@ export const deterministicRulesAgent: VerificationAgent = {
 
     rules.push({
       name: "provider_health",
-      passed: state.providerHealth.filter((h) => h.available).length >= 2,
+      passed:
+        state.providerHealth.filter((h) => h.available).length >= 2,
       detail: `${state.providerHealth.filter((h) => h.available).length}/${state.providerHealth.length} providers healthy`,
       weight: 0.1,
     });
 
     const passedRules = rules.filter((r) => r.passed);
     const totalWeight = rules.reduce((sum, r) => sum + r.weight, 0);
-    const passedWeight = passedRules.reduce((sum, r) => sum + r.weight, 0);
+    const passedWeight = passedRules.reduce(
+      (sum, r) => sum + r.weight,
+      0
+    );
     const confidence = Math.round((passedWeight / totalWeight) * 100);
 
     let predictedWinner: string;
     let homeScore: number | null = null;
     let awayScore: number | null = null;
 
-    if (state.status === "FINISHED" && state.homeScore !== null && state.awayScore !== null) {
+    if (
+      state.status === "FINISHED" &&
+      state.homeScore !== null &&
+      state.awayScore !== null
+    ) {
       homeScore = state.homeScore;
       awayScore = state.awayScore;
-      if (state.homeScore > state.awayScore) predictedWinner = state.homeTeam;
-      else if (state.awayScore > state.homeScore) predictedWinner = state.awayTeam;
+      if (state.homeScore > state.awayScore)
+        predictedWinner = state.homeTeam;
+      else if (state.awayScore > state.homeScore)
+        predictedWinner = state.awayTeam;
       else predictedWinner = "Draw";
     } else {
       predictedWinner = state.homeTeam;
@@ -96,9 +137,10 @@ export const deterministicRulesAgent: VerificationAgent = {
     }));
 
     const failedRules = rules.filter((r) => !r.passed);
-    const explanation = failedRules.length === 0
-      ? `All ${rules.length} validation rules passed. Match state is verified.`
-      : `${passedRules.length}/${rules.length} rules passed. Failed: ${failedRules.map((r) => r.name).join(", ")}.`;
+    const explanation =
+      failedRules.length === 0
+        ? `All ${rules.length} validation rules passed. Match state is verified.`
+        : `${passedRules.length}/${rules.length} rules passed. Failed: ${failedRules.map((r) => r.name).join(", ")}.`;
 
     return {
       agentId: "deterministic-rules",

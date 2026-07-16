@@ -20,47 +20,64 @@ function dedupeMatches(matches: MatchResult[]): MatchResult[] {
 }
 
 export async function GET() {
-  const providerResults = await fetchAllProviders();
-  const allMatches = providerResults.flatMap((pr) => pr.matches);
-  const combined = dedupeMatches(allMatches);
+  try {
+    const providerResults = await fetchAllProviders();
+    const allMatches = providerResults
+      .flatMap((pr) => pr.matches)
+      .filter((m) => m.sport === "FOOTBALL");
+    const combined = dedupeMatches(allMatches);
 
-  const grouped = new Map<string, MatchResult[]>();
-  for (const m of combined) {
-    const key = `${m.homeTeam.toLowerCase()}-${m.awayTeam.toLowerCase()}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(m);
-  }
+    const grouped = new Map<string, MatchResult[]>();
+    for (const m of combined) {
+      const key = `${m.homeTeam.toLowerCase()}-${m.awayTeam.toLowerCase()}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(m);
+    }
 
-  const enriched: EnrichedMatch[] = [];
-  for (const [, group] of grouped) {
-    const first = group[0];
-    const responding = providerResults.filter((pr) => pr.health.available);
-    const providerAgreement = responding.length >= 2;
+    const enriched: EnrichedMatch[] = [];
+    for (const [, group] of grouped) {
+      const first = group[0];
+      const responding = providerResults.filter(
+        (pr) => pr.health.available
+      );
+      const providerAgreement = responding.length >= 2;
 
-    const canonicalState: CanonicalMatchState = {
-      homeTeam: first.homeTeam,
-      awayTeam: first.awayTeam,
-      homeScore: first.homeScore,
-      awayScore: first.awayScore,
-      status: first.status,
-      matchDate: first.matchDate,
-      providerAgreement,
-      providerCount: responding.length,
+      const canonicalState: CanonicalMatchState = {
+        homeTeam: first.homeTeam,
+        awayTeam: first.awayTeam,
+        homeScore: first.homeScore,
+        awayScore: first.awayScore,
+        status: first.status,
+        matchDate: first.matchDate,
+        sport: "FOOTBALL",
+        providerAgreement,
+        providerCount: responding.length,
+        providerHealth: providerResults.map((pr) => pr.health),
+        rawResults: group,
+      };
+
+      const agentOutputs = await Promise.all(
+        agents.map((agent) => agent.verify(canonicalState))
+      );
+
+      const consensus = computeAgentConsensus(
+        agentOutputs,
+        canonicalState
+      );
+      enriched.push({ ...first, consensus });
+    }
+
+    return NextResponse.json({
+      matches: enriched,
       providerHealth: providerResults.map((pr) => pr.health),
-      rawResults: group,
-    };
-
-    const agentOutputs = await Promise.all(
-      agents.map((agent) => agent.verify(canonicalState))
-    );
-
-    const consensus = computeAgentConsensus(agentOutputs, canonicalState);
-    enriched.push({ ...first, consensus });
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch {
+    return NextResponse.json({
+      matches: [],
+      providerHealth: [],
+      fetchedAt: new Date().toISOString(),
+      error: "Failed to fetch matches",
+    });
   }
-
-  return NextResponse.json({
-    matches: enriched,
-    providerHealth: providerResults.map((pr) => pr.health),
-    fetchedAt: new Date().toISOString(),
-  });
 }

@@ -12,4 +12,11 @@ export const agents: VerificationAgent[] = [
 export { statisticalAgent } from "./statistical-agent";
 export { llmReasoningAgent } from "./llm-reasoning-agent";
 export { deterministicRulesAgent } from "./deterministic-rules-agent";
-export type { AgentOutput, AgentEvidence, CanonicalMatchState, ConsensusResult, VerificationAgent } from "./types";
+export type {
+  AgentOutput,
+  AgentEvidence,
+  CanonicalMatchState,
+  ConsensusResult,
+  SettlementDecision,
+  VerificationAgent,
+} from "./types";

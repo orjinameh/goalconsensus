@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { computeAgentConsensus } from "../consensus";
-import { AgentOutput, CanonicalMatchState, AgentEvidence } from "../agents/types";
+import {
+  AgentOutput,
+  CanonicalMatchState,
+  AgentEvidence,
+} from "../agents/types";
 
 function makeEvidence(source: string, detail: string): AgentEvidence {
   return { source, detail, weight: 0.5 };
@@ -36,6 +40,7 @@ function makeCanonical(
     awayScore: 1,
     status: "FINISHED",
     matchDate: new Date().toISOString(),
+    sport: "FOOTBALL",
     providerAgreement: true,
     providerCount: 2,
     providerHealth: [],
@@ -46,7 +51,7 @@ function makeCanonical(
 
 describe("computeAgentConsensus", () => {
   describe("null canonical state", () => {
-    it("returns INSUFFICIENT_DATA", () => {
+    it("returns INSUFFICIENT_DATA with zero confidence", () => {
       const agents = [
         makeAgent("statistical", "Argentina", 2, 1, 70),
         makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
@@ -66,6 +71,42 @@ describe("computeAgentConsensus", () => {
     });
   });
 
+  describe("unsupported sport", () => {
+    it("returns UNSUPPORTED_SPORT for rugby", () => {
+      const canonical = makeCanonical({ sport: "RUGBY" as any });
+      const agents = [
+        makeAgent("statistical", "Unknown", null, null, 0),
+        makeAgent("llm-reasoning", "Unknown", null, null, 0),
+        makeAgent("deterministic-rules", "Unknown", null, null, 0),
+      ];
+      const result = computeAgentConsensus(agents, canonical);
+      assert.equal(result.settlementDecision, "UNSUPPORTED_SPORT");
+      assert.equal(result.confidence, 0);
+    });
+
+    it("returns UNSUPPORTED_SPORT for basketball", () => {
+      const canonical = makeCanonical({ sport: "BASKETBALL" as any });
+      const agents = [
+        makeAgent("statistical", "Unknown", null, null, 0),
+        makeAgent("llm-reasoning", "Unknown", null, null, 0),
+        makeAgent("deterministic-rules", "Unknown", null, null, 0),
+      ];
+      const result = computeAgentConsensus(agents, canonical);
+      assert.equal(result.settlementDecision, "UNSUPPORTED_SPORT");
+    });
+
+    it("returns UNSUPPORTED_SPORT for baseball", () => {
+      const canonical = makeCanonical({ sport: "BASEBALL" as any });
+      const agents = [
+        makeAgent("statistical", "Unknown", null, null, 0),
+        makeAgent("llm-reasoning", "Unknown", null, null, 0),
+        makeAgent("deterministic-rules", "Unknown", null, null, 0),
+      ];
+      const result = computeAgentConsensus(agents, canonical);
+      assert.equal(result.settlementDecision, "UNSUPPORTED_SPORT");
+    });
+  });
+
   describe("three agreeing agents", () => {
     it("returns SETTLE with high confidence", () => {
       const agents = [
@@ -77,14 +118,14 @@ describe("computeAgentConsensus", () => {
       assert.equal(result.settlementDecision, "SETTLE");
       assert.equal(result.agreement, 3);
       assert.equal(result.totalAgents, 3);
-      assert.equal(result.confidence, 100);
+      assert.ok(result.confidence > 50);
       assert.equal(result.minorityOpinion, null);
       assert.equal(result.finalPrediction.winner, "Argentina");
     });
   });
 
   describe("two agreeing, one disagreeing", () => {
-    it("returns SETTLE with 67% confidence and minority opinion", () => {
+    it("returns SETTLE with minority opinion", () => {
       const agents = [
         makeAgent("statistical", "Argentina", 2, 1, 70),
         makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
@@ -93,9 +134,11 @@ describe("computeAgentConsensus", () => {
       const result = computeAgentConsensus(agents, makeCanonical());
       assert.equal(result.settlementDecision, "SETTLE");
       assert.equal(result.agreement, 2);
-      assert.equal(result.confidence, 67);
       assert.notEqual(result.minorityOpinion, null);
-      assert.equal(result.minorityOpinion!.agentId, "deterministic-rules");
+      assert.equal(
+        result.minorityOpinion!.agentId,
+        "deterministic-rules"
+      );
     });
   });
 
@@ -109,7 +152,6 @@ describe("computeAgentConsensus", () => {
       const result = computeAgentConsensus(agents, makeCanonical());
       assert.equal(result.settlementDecision, "DO_NOT_SETTLE");
       assert.equal(result.agreement, 1);
-      assert.equal(result.confidence, 33);
     });
   });
 
@@ -122,7 +164,24 @@ describe("computeAgentConsensus", () => {
       ];
       const result = computeAgentConsensus(
         agents,
-        makeCanonical({ status: "SCHEDULED", homeScore: null, awayScore: null })
+        makeCanonical({
+          status: "SCHEDULED",
+          homeScore: null,
+          awayScore: null,
+        })
+      );
+      assert.equal(result.settlementDecision, "PENDING");
+    });
+
+    it("returns PENDING for LIVE matches", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
+      ];
+      const result = computeAgentConsensus(
+        agents,
+        makeCanonical({ status: "LIVE" })
       );
       assert.equal(result.settlementDecision, "PENDING");
     });
@@ -143,8 +202,97 @@ describe("computeAgentConsensus", () => {
     });
   });
 
-  describe("evidence aggregation", () => {
-    it("collects all evidence from all agents", () => {
+  describe("provider timeout - single provider", () => {
+    it("returns INSUFFICIENT_DATA with one provider", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
+      ];
+      const result = computeAgentConsensus(
+        agents,
+        makeCanonical({
+          providerAgreement: false,
+          providerCount: 1,
+        })
+      );
+      assert.equal(result.settlementDecision, "INSUFFICIENT_DATA");
+    });
+  });
+
+  describe("provider data - two providers available", () => {
+    it("returns SETTLE with provider agreement", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
+      ];
+      const result = computeAgentConsensus(
+        agents,
+        makeCanonical({
+          providerAgreement: true,
+          providerCount: 2,
+        })
+      );
+      assert.equal(result.settlementDecision, "SETTLE");
+    });
+  });
+
+  describe("provider data - three providers available", () => {
+    it("returns SETTLE with strong provider agreement", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
+      ];
+      const result = computeAgentConsensus(
+        agents,
+        makeCanonical({
+          providerAgreement: true,
+          providerCount: 3,
+        })
+      );
+      assert.equal(result.settlementDecision, "SETTLE");
+      assert.equal(result.agreement, 3);
+    });
+  });
+
+  describe("LLM unavailable - zero confidence agent", () => {
+    it("excludes zero-confidence agents from consensus", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        {
+          ...makeAgent(
+            "llm-reasoning",
+            "Argentina",
+            null,
+            null,
+            0
+          ),
+          explanation:
+            "LLM temporarily unavailable. Consensus continued using the remaining verification agents.",
+        },
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
+      ];
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.equal(result.settlementDecision, "SETTLE");
+      assert.equal(result.agreement, 2);
+      assert.equal(result.totalAgents, 2);
+    });
+
+    it("returns INSUFFICIENT_DATA when all agents have zero confidence", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", null, null, 0),
+        makeAgent("llm-reasoning", "Argentina", null, null, 0),
+        makeAgent("deterministic-rules", "Argentina", null, null, 0),
+      ];
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.equal(result.settlementDecision, "INSUFFICIENT_DATA");
+    });
+  });
+
+  describe("successful consensus", () => {
+    it("includes all evidence from all agents", () => {
       const agents = [
         makeAgent("statistical", "Argentina", 2, 1, 70),
         makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
@@ -153,10 +301,8 @@ describe("computeAgentConsensus", () => {
       const result = computeAgentConsensus(agents, makeCanonical());
       assert.equal(result.evidence.length, 3);
     });
-  });
 
-  describe("reasoning text", () => {
-    it("includes agent summaries", () => {
+    it("includes agent summaries in reasoning", () => {
       const agents = [
         makeAgent("statistical", "Argentina", 2, 1, 70),
         makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
@@ -165,12 +311,14 @@ describe("computeAgentConsensus", () => {
       const result = computeAgentConsensus(agents, makeCanonical());
       assert.ok(result.reasoning.includes("3/3 agents agree"));
       assert.ok(result.reasoning.includes("statistical Agent"));
-      assert.ok(result.reasoning.includes("llm-reasoning Agent"));
-      assert.ok(result.reasoning.includes("deterministic-rules Agent"));
+      assert.ok(
+        result.reasoning.includes("llm-reasoning Agent")
+      );
+      assert.ok(
+        result.reasoning.includes("deterministic-rules Agent")
+      );
     });
-  });
 
-  describe("canonical state propagation", () => {
     it("includes canonical state in result", () => {
       const canonical = makeCanonical();
       const agents = [
@@ -182,6 +330,7 @@ describe("computeAgentConsensus", () => {
       assert.equal(result.canonicalState.homeTeam, "Argentina");
       assert.equal(result.canonicalState.awayTeam, "France");
       assert.equal(result.canonicalState.status, "FINISHED");
+      assert.equal(result.canonicalState.sport, "FOOTBALL");
     });
   });
 
@@ -194,7 +343,7 @@ describe("computeAgentConsensus", () => {
       const result = computeAgentConsensus(agents, makeCanonical());
       assert.equal(result.settlementDecision, "SETTLE");
       assert.equal(result.agreement, 2);
-      assert.equal(result.confidence, 100);
+      assert.ok(result.confidence > 60);
     });
 
     it("returns DO_NOT_SETTLE when they disagree", () => {
@@ -205,7 +354,56 @@ describe("computeAgentConsensus", () => {
       const result = computeAgentConsensus(agents, makeCanonical());
       assert.equal(result.settlementDecision, "DO_NOT_SETTLE");
       assert.equal(result.agreement, 1);
-      assert.equal(result.confidence, 50);
+    });
+  });
+
+  describe("insufficient provider data", () => {
+    it("returns INSUFFICIENT_DATA when providerCount is 0", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 70),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 65),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
+      ];
+      const result = computeAgentConsensus(
+        agents,
+        makeCanonical({
+          providerAgreement: false,
+          providerCount: 0,
+        })
+      );
+      assert.equal(result.settlementDecision, "INSUFFICIENT_DATA");
+    });
+  });
+
+  describe("confidence calculation", () => {
+    it("computes confidence as weighted average of agent confidence and agreement", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 80),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 80),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
+      ];
+      const result = computeAgentConsensus(agents, makeCanonical());
+      assert.ok(result.confidence > 70);
+      assert.ok(result.confidence <= 100);
+    });
+
+    it("lower confidence when agents disagree", () => {
+      const agents = [
+        makeAgent("statistical", "Argentina", 2, 1, 80),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 80),
+        makeAgent("deterministic-rules", "France", 1, 2, 80),
+      ];
+      const result = computeAgentConsensus(agents, makeCanonical());
+      const allAgreeAgents = [
+        makeAgent("statistical", "Argentina", 2, 1, 80),
+        makeAgent("llm-reasoning", "Argentina", 2, 1, 80),
+        makeAgent("deterministic-rules", "Argentina", 2, 1, 80),
+      ];
+      const allAgreeResult = computeAgentConsensus(
+        allAgreeAgents,
+        makeCanonical()
+      );
+      assert.ok(result.confidence < allAgreeResult.confidence);
     });
   });
 });

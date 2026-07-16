@@ -1,5 +1,7 @@
 import axios from "axios";
 
+const SUPPORTED_SPORTS = ["FOOTBALL"] as const;
+
 export interface MatchResult {
   id: string;
   homeTeam: string;
@@ -8,6 +10,7 @@ export interface MatchResult {
   awayScore: number | null;
   status: "SCHEDULED" | "LIVE" | "FINISHED";
   matchDate: string;
+  sport: "FOOTBALL";
   providerId: string;
 }
 
@@ -86,25 +89,34 @@ class FootballDataProvider implements Provider {
           timeout: DEFAULT_TIMEOUT,
         }
       );
-      return (res.data.matches || []).map((m: Record<string, unknown>) => {
-        const home = m.homeTeam as Record<string, string> | undefined;
-        const away = m.awayTeam as Record<string, string> | undefined;
-        const score = m.score as Record<string, Record<string, number>> | undefined;
-        const fullTime = score?.fullTime;
-        let status: "SCHEDULED" | "LIVE" | "FINISHED" = "SCHEDULED";
-        if (m.status === "FINISHED") status = "FINISHED";
-        else if (m.status === "IN_PLAY" || m.status === "PAUSED") status = "LIVE";
-        return {
-          id: `${this.metadata.id}-${m.id}`,
-          homeTeam: home?.name || "Unknown",
-          awayTeam: away?.name || "Unknown",
-          homeScore: fullTime?.home ?? null,
-          awayScore: fullTime?.away ?? null,
-          status,
-          matchDate: (m.utcDate as string) || new Date().toISOString(),
-          providerId: this.metadata.id,
-        } as MatchResult;
-      });
+      return (res.data.matches || [])
+        .filter((m: Record<string, unknown>) => {
+          const sport = m.sport as string | undefined;
+          return !sport || sport.toLowerCase() === "football";
+        })
+        .map((m: Record<string, unknown>) => {
+          const home = m.homeTeam as Record<string, string> | undefined;
+          const away = m.awayTeam as Record<string, string> | undefined;
+          const score = m.score as
+            | Record<string, Record<string, number>>
+            | undefined;
+          const fullTime = score?.fullTime;
+          let status: "SCHEDULED" | "LIVE" | "FINISHED" = "SCHEDULED";
+          if (m.status === "FINISHED") status = "FINISHED";
+          else if (m.status === "IN_PLAY" || m.status === "PAUSED")
+            status = "LIVE";
+          return {
+            id: `${this.metadata.id}-${m.id}`,
+            homeTeam: home?.name || "Unknown",
+            awayTeam: away?.name || "Unknown",
+            homeScore: fullTime?.home ?? null,
+            awayScore: fullTime?.away ?? null,
+            status,
+            matchDate: (m.utcDate as string) || new Date().toISOString(),
+            sport: "FOOTBALL" as const,
+            providerId: this.metadata.id,
+          } as MatchResult;
+        });
     });
   }
 
@@ -153,8 +165,12 @@ class TheSportsDBProvider implements Provider {
             id: `${this.metadata.id}-${e.idEvent}`,
             homeTeam: (e.strHomeTeam as string) || "Unknown",
             awayTeam: (e.strAwayTeam as string) || "Unknown",
-            homeScore: e.intHomeScore ? parseInt(e.intHomeScore as string, 10) : null,
-            awayScore: e.intAwayScore ? parseInt(e.intAwayScore as string, 10) : null,
+            homeScore: e.intHomeScore
+              ? parseInt(e.intHomeScore as string, 10)
+              : null,
+            awayScore: e.intAwayScore
+              ? parseInt(e.intAwayScore as string, 10)
+              : null,
             status:
               e.strStatus === "Match Finished"
                 ? "FINISHED"
@@ -164,6 +180,7 @@ class TheSportsDBProvider implements Provider {
             matchDate: e.dateEvent
               ? `${e.dateEvent}T${e.strTime || "00:00:00"}Z`
               : new Date().toISOString(),
+            sport: "FOOTBALL" as const,
             providerId: this.metadata.id,
           }) as MatchResult
       );
@@ -282,9 +299,21 @@ export async function buildCanonicalState(
     awayScore: first.awayScore,
     status: first.status,
     matchDate: first.matchDate,
+    sport: "FOOTBALL",
     providerAgreement,
     providerCount: responding.length,
     providerHealth: providerResults.map((pr) => pr.health),
     rawResults: allMatches,
   };
+}
+
+export function isUnsupportedSport(
+  _homeTeam: string,
+  _awayTeam: string
+): boolean {
+  return false;
+}
+
+export function getSupportedSports(): readonly string[] {
+  return SUPPORTED_SPORTS;
 }

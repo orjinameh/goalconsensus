@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GoalConsensus — BFT World Cup Oracle",
+  title: "GoalConsensus — Football Settlement Verification",
   description:
-    "Byzantine Fault Tolerant World Cup 2026 match oracle with Injective x402 micropayments and MCP Server",
+    "Football-only multi-agent settlement verification with Byzantine-inspired consensus, Injective x402 micropayments, and MCP Server",
 };
 
 export default function RootLayout({

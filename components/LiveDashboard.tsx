@@ -9,7 +9,9 @@ type EnrichedMatch = MatchResult & { consensus: ConsensusResult };
 
 export function LiveDashboard() {
   const [matches, setMatches] = useState<EnrichedMatch[]>([]);
-  const [providerHealth, setProviderHealth] = useState<ProviderHealth[]>([]);
+  const [providerHealth, setProviderHealth] = useState<
+    ProviderHealth[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +37,9 @@ export function LiveDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-gray-500 text-sm">Loading matches...</div>
+        <div className="text-gray-500 text-sm">
+          Loading football matches...
+        </div>
       </div>
     );
   }
@@ -66,7 +70,9 @@ export function LiveDashboard() {
               />
               <span className="font-mono">{h.providerId}</span>
               <span className="text-gray-500">
-                {h.available ? `${h.latencyMs}ms` : "unavailable"}
+                {h.available
+                  ? `${h.latencyMs}ms`
+                  : "unavailable"}
               </span>
             </div>
           ))}
@@ -78,7 +84,7 @@ export function LiveDashboard() {
         ))}
         {matches.length === 0 && (
           <div className="col-span-full text-center py-20 text-gray-500 text-sm">
-            No matches found
+            No football matches found
           </div>
         )}
       </div>

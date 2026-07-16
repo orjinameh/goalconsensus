@@ -1,5 +1,12 @@
 import { MatchResult, ProviderHealth } from "../providers";
 
+export type SettlementDecision =
+  | "SETTLE"
+  | "DO_NOT_SETTLE"
+  | "PENDING"
+  | "INSUFFICIENT_DATA"
+  | "UNSUPPORTED_SPORT";
+
 export interface AgentEvidence {
   source: string;
   detail: string;
@@ -28,6 +35,7 @@ export interface CanonicalMatchState {
   awayScore: number | null;
   status: "SCHEDULED" | "LIVE" | "FINISHED";
   matchDate: string;
+  sport: "FOOTBALL";
   providerAgreement: boolean;
   providerCount: number;
   providerHealth: ProviderHealth[];
@@ -46,7 +54,7 @@ export interface ConsensusResult {
   minorityOpinion: AgentOutput | null;
   evidence: AgentEvidence[];
   reasoning: string;
-  settlementDecision: "SETTLE" | "DO_NOT_SETTLE" | "PENDING" | "INSUFFICIENT_DATA";
+  settlementDecision: SettlementDecision;
   agents: AgentOutput[];
   canonicalState: CanonicalMatchState;
 }

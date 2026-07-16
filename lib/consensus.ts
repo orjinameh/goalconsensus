@@ -1,5 +1,11 @@
 import { ProviderHealth } from "./providers";
-import { AgentOutput, AgentEvidence, CanonicalMatchState, ConsensusResult } from "./agents/types";
+import {
+  AgentOutput,
+  AgentEvidence,
+  CanonicalMatchState,
+  ConsensusResult,
+  SettlementDecision,
+} from "./agents/types";
 
 export type { ConsensusResult } from "./agents/types";
 
@@ -9,7 +15,11 @@ export function computeAgentConsensus(
 ): ConsensusResult {
   if (!canonicalState) {
     return {
-      finalPrediction: { winner: "Unknown", homeScore: null, awayScore: null },
+      finalPrediction: {
+        winner: "Unknown",
+        homeScore: null,
+        awayScore: null,
+      },
       agreement: 0,
       totalAgents: agentOutputs.length,
       confidence: 0,
@@ -25,6 +35,7 @@ export function computeAgentConsensus(
         awayScore: null,
         status: "SCHEDULED",
         matchDate: new Date().toISOString(),
+        sport: "FOOTBALL",
         providerAgreement: false,
         providerCount: 0,
         providerHealth: [],
@@ -33,9 +44,32 @@ export function computeAgentConsensus(
     };
   }
 
+  if (canonicalState.sport !== "FOOTBALL") {
+    return {
+      finalPrediction: {
+        winner: "Unknown",
+        homeScore: null,
+        awayScore: null,
+      },
+      agreement: 0,
+      totalAgents: agentOutputs.length,
+      confidence: 0,
+      minorityOpinion: null,
+      evidence: [],
+      reasoning: `UNSUPPORTED_SPORT: GoalConsensus only supports football. Received: ${canonicalState.sport}.`,
+      settlementDecision: "UNSUPPORTED_SPORT",
+      agents: agentOutputs,
+      canonicalState,
+    };
+  }
+
   if (agentOutputs.length === 0) {
     return {
-      finalPrediction: { winner: canonicalState.homeTeam, homeScore: canonicalState.homeScore, awayScore: canonicalState.awayScore },
+      finalPrediction: {
+        winner: canonicalState.homeTeam,
+        homeScore: canonicalState.homeScore,
+        awayScore: canonicalState.awayScore,
+      },
       agreement: 0,
       totalAgents: 0,
       confidence: 0,
@@ -48,7 +82,28 @@ export function computeAgentConsensus(
     };
   }
 
-  const totalAgents = agentOutputs.length;
+  const activeAgents = agentOutputs.filter((a) => a.confidence > 0);
+
+  if (activeAgents.length === 0) {
+    return {
+      finalPrediction: {
+        winner: canonicalState.homeTeam,
+        homeScore: canonicalState.homeScore,
+        awayScore: canonicalState.awayScore,
+      },
+      agreement: 0,
+      totalAgents: agentOutputs.length,
+      confidence: 0,
+      minorityOpinion: null,
+      evidence: agentOutputs.flatMap((a) => a.evidence),
+      reasoning: "All agents returned zero confidence. No reliable prediction.",
+      settlementDecision: "INSUFFICIENT_DATA",
+      agents: agentOutputs,
+      canonicalState,
+    };
+  }
+
+  const totalAgents = activeAgents.length;
   const threshold = Math.ceil((2 * totalAgents) / 3);
 
   function agentWinnerKey(a: AgentOutput): string {
@@ -56,7 +111,7 @@ export function computeAgentConsensus(
   }
 
   const winnerGroups = new Map<string, AgentOutput[]>();
-  for (const agent of agentOutputs) {
+  for (const agent of activeAgents) {
     const key = agentWinnerKey(agent);
     if (!winnerGroups.has(key)) winnerGroups.set(key, []);
     winnerGroups.get(key)!.push(agent);
@@ -71,19 +126,28 @@ export function computeAgentConsensus(
     }
   }
 
-  const minorityAgents = agentOutputs.filter(
+  const minorityAgents = activeAgents.filter(
     (a) => agentWinnerKey(a) !== majorityKey
   );
-  const minorityOpinion = minorityAgents.length > 0 ? minorityAgents[0] : null;
+  const minorityOpinion =
+    minorityAgents.length > 0 ? minorityAgents[0] : null;
 
   const agreement = majorityGroup.length;
-  const confidence = totalAgents > 0 ? Math.round((agreement / totalAgents) * 100) : 0;
+
+  const avgAgentConfidence =
+    activeAgents.reduce((sum, a) => sum + a.confidence, 0) / totalAgents;
+  const agreementRatio = agreement / totalAgents;
+  const confidence = Math.round(
+    avgAgentConfidence * 0.6 + agreementRatio * 40
+  );
 
   const majorityPrediction = majorityGroup[0].prediction;
 
-  const allEvidence: AgentEvidence[] = agentOutputs.flatMap((a) => a.evidence);
+  const allEvidence: AgentEvidence[] = agentOutputs.flatMap(
+    (a) => a.evidence
+  );
 
-  let settlementDecision: ConsensusResult["settlementDecision"];
+  let settlementDecision: SettlementDecision;
   if (canonicalState.status !== "FINISHED") {
     settlementDecision = "PENDING";
   } else if (!canonicalState.providerAgreement) {
@@ -94,13 +158,17 @@ export function computeAgentConsensus(
     settlementDecision = "DO_NOT_SETTLE";
   }
 
-  const agentSummaries = agentOutputs
-    .map((a) => `${a.agentName}: ${a.prediction.winner} (${a.confidence}%)`)
+  const agentSummaries = activeAgents
+    .map(
+      (a) =>
+        `${a.agentName}: ${a.prediction.winner} (${a.confidence}%)`
+    )
     .join("; ");
 
-  const reasoning = agreement >= threshold
-    ? `${agreement}/${totalAgents} agents agree on ${majorityPrediction.winner} ${majorityPrediction.homeScore ?? "?"}-${majorityPrediction.awayScore ?? "?"} ${majorityPrediction.awayScore !== undefined ? canonicalState.awayTeam : ""}. BFT threshold (${threshold}/${totalAgents}) met. Settlement: ${settlementDecision}. Agents: ${agentSummaries}.`
-    : `${agreement}/${totalAgents} agents agree. BFT threshold (${threshold}/${totalAgents}) not met. Settlement: ${settlementDecision}. Agents: ${agentSummaries}.`;
+  const reasoning =
+    agreement >= threshold
+      ? `${agreement}/${totalAgents} agents agree on ${majorityPrediction.winner} ${majorityPrediction.homeScore ?? "?"}-${majorityPrediction.awayScore ?? "?"}. BFT threshold (${threshold}/${totalAgents}) met. Settlement: ${settlementDecision}. Agents: ${agentSummaries}.`
+      : `${agreement}/${totalAgents} agents agree. BFT threshold (${threshold}/${totalAgents}) not met. Settlement: ${settlementDecision}. Agents: ${agentSummaries}.`;
 
   return {
     finalPrediction: majorityPrediction,
