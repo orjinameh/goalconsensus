@@ -1,7 +1,8 @@
 "use client";
 
-import { ConsensusResult } from "@/lib/consensus";
 import { CheckCircle2, XCircle, Minus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { ConsensusResult } from "@/lib/consensus";
 
 interface Props {
   consensus: ConsensusResult;
@@ -31,13 +32,14 @@ export function ConsensusIndicator({ consensus }: Props) {
               className="flex flex-col items-center gap-1.5"
             >
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                className={cn(
+                  "w-9 h-9 rounded-full flex items-center justify-center transition-colors",
                   isUnavailable
-                    ? "bg-gray-700/50 text-gray-500"
+                    ? "bg-surface-4 text-text-muted"
                     : agrees
-                      ? "bg-green-500/20 text-green-400"
-                      : "bg-red-500/20 text-red-400"
-                }`}
+                      ? "bg-accent-green-dim text-accent-green"
+                      : "bg-accent-red-dim text-accent-red"
+                )}
                 title={`${label}: ${agent.prediction.winner}`}
               >
                 {isUnavailable ? (
@@ -48,7 +50,7 @@ export function ConsensusIndicator({ consensus }: Props) {
                   <XCircle size={14} />
                 )}
               </div>
-              <span className="text-[10px] text-gray-400 max-w-[60px] text-center leading-tight">
+              <span className="text-2xs text-text-muted max-w-[60px] text-center leading-tight">
                 {label}
               </span>
             </div>
@@ -56,19 +58,20 @@ export function ConsensusIndicator({ consensus }: Props) {
         })}
       </div>
 
-      <div className="flex items-center justify-center gap-2 text-[10px] text-gray-500">
+      <div className="flex items-center justify-center gap-2 text-2xs text-text-muted">
         <span>
           {consensus.agreement} of {consensus.totalAgents} agree
         </span>
-        <span className="text-gray-700">|</span>
+        <span className="text-text-muted">|</span>
         <span
-          className={
+          className={cn(
+            "font-medium",
             consensus.settlementDecision === "SETTLE"
-              ? "text-green-400 font-medium"
+              ? "text-accent-green"
               : consensus.settlementDecision === "DO_NOT_SETTLE"
-                ? "text-red-400 font-medium"
-                : "text-yellow-400"
-          }
+                ? "text-accent-red"
+                : "text-accent-yellow"
+          )}
         >
           {consensus.settlementDecision === "SETTLE"
             ? "Safe to Settle"

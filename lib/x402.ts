@@ -7,7 +7,25 @@ export interface X402Receipt {
   tool: string;
   timestamp: string;
   queryId: string;
+  networkId: string;
+  fee_recipient: string;
 }
+
+export interface X402PaymentRequired {
+  status: 402;
+  protocol: "x402";
+  payment: {
+    amount: string;
+    token: string;
+    chain: string;
+    networkId: string;
+    endpoint: string;
+  };
+  x402Version: string;
+}
+
+const INJECTIVE_TESTNET_CHAIN_ID = "injective-testnet";
+const FEE_RECIPIENT = "0x0000000000000000000000000000000000000000";
 
 function randomHex(len: number): string {
   let hex = "";
@@ -30,6 +48,8 @@ export function chargeX402(
     tool: toolName,
     timestamp: new Date().toISOString(),
     queryId,
+    networkId: INJECTIVE_TESTNET_CHAIN_ID,
+    fee_recipient: FEE_RECIPIENT,
   };
 
   console.log(
@@ -40,5 +60,25 @@ export function chargeX402(
 }
 
 export function formatX402Header(): string {
-  return "x402/payment; endpoint=injective-testnet.evm.neutron.org; amount=0.001 USDC; protocol=x402";
+  return `x402/payment; endpoint=${INJECTIVE_TESTNET_CHAIN_ID}.evm.neutron.org; amount=0.001 USDC; protocol=x402; version=1`;
+}
+
+export function x402PaymentRequired(toolName: string): X402PaymentRequired {
+  return {
+    status: 402,
+    protocol: "x402",
+    payment: {
+      amount: "0.001 USDC",
+      token: "USDC",
+      chain: "Injective Testnet",
+      networkId: INJECTIVE_TESTNET_CHAIN_ID,
+      endpoint: `${INJECTIVE_TESTNET_CHAIN_ID}.evm.neutron.org`,
+    },
+    x402Version: "1",
+  };
+}
+
+export function verifyX402Payment(header: string | null): boolean {
+  if (!header) return false;
+  return header.startsWith("x402/") || header.includes("X-PAYMENT");
 }

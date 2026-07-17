@@ -1,10 +1,26 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GoalConsensus — Football Settlement Verification",
+  title: "GoalConsensus — Multi-Agent Settlement Verification",
   description:
-    "Football-only multi-agent settlement verification with Byzantine-inspired consensus, Injective x402 micropayments, and MCP Server",
+    "Verify football match results using independent verification agents before prediction market settlement. Byzantine-inspired consensus across statistical, AI, and rule-based agents.",
+  keywords: [
+    "football",
+    "settlement verification",
+    "prediction markets",
+    "consensus",
+    "AI verification",
+    "Injective",
+    "x402",
+  ],
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#0a0a0a",
 };
 
 export default function RootLayout({
@@ -13,8 +29,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-[#0a0a0a] text-white font-sans antialiased">
+    <html lang="en" className="dark">
+      <body className="bg-surface-1 text-text-primary font-sans antialiased min-h-screen">
         {children}
       </body>
     </html>

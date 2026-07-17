@@ -1,19 +1,22 @@
 {
   "name": "goalconsensus",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Byzantine Fault Tolerant World Cup 2026 match oracle with Injective x402 and MCP",
+  "description": "Multi-Agent Settlement Verification Engine for Football Prediction Markets",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "mcp": "tsx mcp-server/index.ts",
-    "test": "tsx --test lib/__tests__/*.test.ts"
+    "test": "tsx --test lib/__tests__/*.test.ts",
+    "lint": "next lint"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
     "axios": "^1.7.0",
+    "clsx": "^2.1.0",
     "dotenv": "^16.4.0",
+    "framer-motion": "^11.0.0",
     "groq-sdk": "^0.8.0",
     "lucide-react": "^0.400.0",
     "next": "^14.2.0",
@@ -22,10 +25,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
-    "@types/prop-types": "^15.7.15",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "@types/prop-types": "^15.0.0",
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",

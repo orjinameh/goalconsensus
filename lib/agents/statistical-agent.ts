@@ -4,49 +4,15 @@ import {
   AgentOutput,
   AgentEvidence,
 } from "./types";
-
-const TEAM_STRENGTH: Record<string, number> = {
-  argentina: 92,
-  brazil: 90,
-  france: 91,
-  england: 88,
-  spain: 89,
-  germany: 87,
-  portugal: 86,
-  netherlands: 85,
-  belgium: 84,
-  italy: 85,
-  croatia: 82,
-  morocco: 78,
-  japan: 77,
-  "south korea": 76,
-  usa: 74,
-  mexico: 73,
-  senegal: 75,
-  uruguay: 83,
-  colombia: 79,
-  ecuador: 72,
-  "iran": 68,
-  "australia": 70,
-  "serbia": 74,
-  "switzerland": 76,
-  poland: 75,
-  "cameroon": 71,
-  "ghana": 70,
-  "tunisia": 69,
-  "canada": 72,
-  "saudi arabia": 65,
-  "qatar": 62,
-};
-
-const HOME_ADVANTAGE_XG = 0.35;
+import {
+  getTeamRating,
+  getHeadToHeadModifier,
+  type TeamRating,
+} from "../team-ratings";
 
 const BASE_GOALS_HOME = 1.45;
 const BASE_GOALS_AWAY = 1.15;
-
-function getStrength(team: string): number {
-  return TEAM_STRENGTH[team.toLowerCase().trim()] || 70;
-}
+const MONTE_CARLO_SIMS = 1500;
 
 function poissonProb(lambda: number, k: number): number {
   if (lambda <= 0) return k === 0 ? 1 : 0;
@@ -72,32 +38,32 @@ function computeExpectedGoals(
   awayTeam: string,
   providerHomeScore: number | null,
   providerAwayScore: number | null
-): { homeXG: number; awayXG: number } {
-  const homeStr = getStrength(homeTeam);
-  const awayStr = getStrength(awayTeam);
-  const avgStrength = 80;
+): { homeXG: number; awayXG: number; homeRating: TeamRating; awayRating: TeamRating } {
+  const homeRating = getTeamRating(homeTeam);
+  const awayRating = getTeamRating(awayTeam);
 
-  const homeAttackStrength = (homeStr - avgStrength) / 100;
-  const awayDefenseWeakness = (avgStrength - awayStr) / 120;
-  const awayAttackStrength = (awayStr - avgStrength) / 100;
-  const homeDefenseWeakness = (avgStrength - homeStr) / 120;
+  const avgStrength = 75;
+  const homeAttackMod = (homeRating.attackStrength - 0.5) * 2;
+  const awayDefenseMod = (0.5 - awayRating.defenseStrength) * 1.5;
+  const awayAttackMod = (awayRating.attackStrength - 0.5) * 2;
+  const homeDefenseMod = (0.5 - homeRating.defenseStrength) * 1.5;
+
+  const h2hModifier = getHeadToHeadModifier(homeTeam, awayTeam);
 
   let homeXG =
-    BASE_GOALS_HOME + homeAttackStrength + awayDefenseWeakness + HOME_ADVANTAGE_XG;
+    BASE_GOALS_HOME + homeAttackMod + awayDefenseMod + homeRating.homeAdvantage + h2hModifier;
   let awayXG =
-    BASE_GOALS_AWAY + awayAttackStrength + homeDefenseWeakness;
+    BASE_GOALS_AWAY + awayAttackMod + homeDefenseMod - h2hModifier;
 
   if (providerHomeScore !== null && providerAwayScore !== null) {
-    const observedHome = providerHomeScore;
-    const observedAway = providerAwayScore;
-    homeXG = homeXG * 0.4 + observedHome * 0.6;
-    awayXG = awayXG * 0.4 + observedAway * 0.6;
+    homeXG = homeXG * 0.4 + providerHomeScore * 0.6;
+    awayXG = awayXG * 0.4 + providerAwayScore * 0.6;
   }
 
   homeXG = Math.max(0.2, Math.min(4.5, homeXG));
   awayXG = Math.max(0.2, Math.min(4.5, awayXG));
 
-  return { homeXG, awayXG };
+  return { homeXG, awayXG, homeRating, awayRating };
 }
 
 function predictMostLikelyScore(
@@ -122,13 +88,12 @@ function predictMostLikelyScore(
 
 function monteCarloWinProbability(
   homeXG: number,
-  awayXG: number,
-  simulations: number = 10000
+  awayXG: number
 ): { home: number; draw: number; away: number } {
   let homeWins = 0;
   let draws = 0;
   let awayWins = 0;
-  for (let s = 0; s < simulations; s++) {
+  for (let s = 0; s < MONTE_CARLO_SIMS; s++) {
     const h = samplePoisson(homeXG);
     const a = samplePoisson(awayXG);
     if (h > a) homeWins++;
@@ -136,9 +101,9 @@ function monteCarloWinProbability(
     else awayWins++;
   }
   return {
-    home: homeWins / simulations,
-    draw: draws / simulations,
-    away: awayWins / simulations,
+    home: homeWins / MONTE_CARLO_SIMS,
+    draw: draws / MONTE_CARLO_SIMS,
+    away: awayWins / MONTE_CARLO_SIMS,
   };
 }
 
@@ -186,7 +151,7 @@ export const statisticalAgent: VerificationAgent = {
       };
     }
 
-    const { homeXG, awayXG } = computeExpectedGoals(
+    const { homeXG, awayXG, homeRating, awayRating } = computeExpectedGoals(
       state.homeTeam,
       state.awayTeam,
       state.homeScore,
@@ -210,18 +175,15 @@ export const statisticalAgent: VerificationAgent = {
       predictedWinner = "Draw";
     }
 
-    const homeStr = getStrength(state.homeTeam);
-    const awayStr = getStrength(state.awayTeam);
-
     const evidence: AgentEvidence[] = [
       {
         source: "statistical",
-        detail: `${state.homeTeam} strength: ${homeStr}/100`,
+        detail: `${state.homeTeam} dynamic rating: ${homeRating.rating}/99 (attack: ${(homeRating.attackStrength * 100).toFixed(0)}%, defense: ${(homeRating.defenseStrength * 100).toFixed(0)}%)`,
         weight: 0.2,
       },
       {
         source: "statistical",
-        detail: `${state.awayTeam} strength: ${awayStr}/100`,
+        detail: `${state.awayTeam} dynamic rating: ${awayRating.rating}/99 (attack: ${(awayRating.attackStrength * 100).toFixed(0)}%, defense: ${(awayRating.defenseStrength * 100).toFixed(0)}%)`,
         weight: 0.2,
       },
       {
@@ -231,12 +193,12 @@ export const statisticalAgent: VerificationAgent = {
       },
       {
         source: "statistical",
-        detail: `Win probability: Home ${(probs.home * 100).toFixed(1)}% | Draw ${(probs.draw * 100).toFixed(1)}% | Away ${(probs.away * 100).toFixed(1)}%`,
+        detail: `Monte Carlo (${MONTE_CARLO_SIMS} sims): Home ${(probs.home * 100).toFixed(1)}% | Draw ${(probs.draw * 100).toFixed(1)}% | Away ${(probs.away * 100).toFixed(1)}%`,
         weight: 0.2,
       },
       {
         source: "statistical",
-        detail: `Model certainty: ${confidence}% (entropy-based)`,
+        detail: `Model certainty: ${confidence}% (entropy-based confidence from probability distribution)`,
         weight: 0.2,
       },
     ];
@@ -251,10 +213,11 @@ export const statisticalAgent: VerificationAgent = {
       },
       confidence,
       explanation:
-        `Based on team form and strength, predicts ${state.homeTeam} ${score.home}-${score.away} ${state.awayTeam}. ` +
-        `${state.homeTeam} win chance: ${(probs.home * 100).toFixed(0)}%, ` +
+        `Based on dynamic team ratings and Poisson model, predicts ${state.homeTeam} ${score.home}-${score.away} ${state.awayTeam}. ` +
+        `Home win: ${(probs.home * 100).toFixed(0)}%, ` +
         `Draw: ${(probs.draw * 100).toFixed(0)}%, ` +
-        `${state.awayTeam} win: ${(probs.away * 100).toFixed(0)}%.`,
+        `Away win: ${(probs.away * 100).toFixed(0)}%. ` +
+        `Team ratings: ${state.homeTeam} ${homeRating.rating} vs ${state.awayTeam} ${awayRating.rating}.`,
       evidence,
       timestamp: new Date().toISOString(),
       latencyMs: Date.now() - start,

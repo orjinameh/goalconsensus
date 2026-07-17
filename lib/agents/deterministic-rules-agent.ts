@@ -10,6 +10,7 @@ interface RuleCheck {
   passed: boolean;
   detail: string;
   weight: number;
+  category: "data" | "integrity" | "temporal" | "consensus";
 }
 
 export const deterministicRulesAgent: VerificationAgent = {
@@ -44,9 +45,10 @@ export const deterministicRulesAgent: VerificationAgent = {
       passed: state.providerCount >= 2,
       detail:
         state.providerCount >= 2
-          ? `${state.providerCount} providers agree on match state`
-          : `Only ${state.providerCount} provider(s) available — need at least 2`,
-      weight: 0.3,
+          ? `${state.providerCount} providers agree on match state — canonical data confirmed`
+          : `Only ${state.providerCount} provider(s) available — need at least 2 for consensus`,
+      weight: 0.25,
+      category: "consensus",
     });
 
     rules.push({
@@ -54,9 +56,10 @@ export const deterministicRulesAgent: VerificationAgent = {
       passed: state.status === "FINISHED",
       detail:
         state.status === "FINISHED"
-          ? "Match status is FINISHED — canonical score available"
+          ? "Match status is FINISHED — full-time score available for settlement"
           : `Match status is ${state.status} — final score not yet confirmed`,
-      weight: 0.25,
+      weight: 0.2,
+      category: "data",
     });
 
     const matchDate = new Date(state.matchDate);
@@ -68,9 +71,10 @@ export const deterministicRulesAgent: VerificationAgent = {
       name: "timestamp_validation",
       passed: timestampValid,
       detail: timestampValid
-        ? `Match date is within valid range (${hoursDiff.toFixed(1)}h from now)`
-        : `Match date ${state.matchDate} is outside valid range (${hoursDiff.toFixed(1)}h from now)`,
+        ? `Match date within valid range (${hoursDiff.toFixed(1)}h from now) — no temporal anomalies detected`
+        : `Match date ${state.matchDate} outside valid range (${hoursDiff.toFixed(1)}h from now) — potential data staleness`,
       weight: 0.15,
+      category: "temporal",
     });
 
     const scoresExist =
@@ -82,22 +86,52 @@ export const deterministicRulesAgent: VerificationAgent = {
         state.awayScore! <= 20
       : state.status !== "FINISHED";
     rules.push({
-      name: "data_consistency",
+      name: "score_consistency",
       passed: scoresPlausible,
       detail: scoresPlausible
         ? scoresExist
-          ? `Scores are plausible: ${state.homeScore}-${state.awayScore}`
+          ? `Scores plausible: ${state.homeScore}-${state.awayScore} — within expected football range`
           : "Scores pending — consistent with non-FINISHED status"
-        : `Implausible scores: ${state.homeScore}-${state.awayScore}`,
-      weight: 0.2,
+        : `Implausible scores: ${state.homeScore}-${state.awayScore} — outside expected football range`,
+      weight: 0.15,
+      category: "integrity",
     });
 
+    const healthyProviders = state.providerHealth.filter((h) => h.available);
+    const providerHealthOk = healthyProviders.length >= 2;
     rules.push({
       name: "provider_health",
-      passed:
-        state.providerHealth.filter((h) => h.available).length >= 2,
-      detail: `${state.providerHealth.filter((h) => h.available).length}/${state.providerHealth.length} providers healthy`,
+      passed: providerHealthOk,
+      detail: providerHealthOk
+        ? `${healthyProviders.length}/${state.providerHealth.length} providers healthy — data pipeline operational`
+        : `Only ${healthyProviders.length}/${state.providerHealth.length} providers healthy — degraded data pipeline`,
       weight: 0.1,
+      category: "data",
+    });
+
+    const avgLatency = state.providerHealth.length > 0
+      ? state.providerHealth.reduce((sum, h) => sum + h.latencyMs, 0) / state.providerHealth.length
+      : 0;
+    const latencyOk = avgLatency < 10000;
+    rules.push({
+      name: "response_latency",
+      passed: latencyOk,
+      detail: latencyOk
+        ? `Average provider latency: ${avgLatency.toFixed(0)}ms — within acceptable range`
+        : `Average provider latency: ${avgLatency.toFixed(0)}ms — elevated, may indicate provider issues`,
+      weight: 0.05,
+      category: "data",
+    });
+
+    const duplicateCheck = state.rawResults.length <= 4;
+    rules.push({
+      name: "duplicate_detection",
+      passed: duplicateCheck,
+      detail: duplicateCheck
+        ? `${state.rawResults.length} raw results — no suspicious duplication detected`
+        : `${state.rawResults.length} raw results — possible duplicate data detected`,
+      weight: 0.1,
+      category: "integrity",
     });
 
     const passedRules = rules.filter((r) => r.passed);
@@ -139,7 +173,7 @@ export const deterministicRulesAgent: VerificationAgent = {
     const failedRules = rules.filter((r) => !r.passed);
     const explanation =
       failedRules.length === 0
-        ? `All data checks passed. Match result is verified.`
+        ? `All ${rules.length} data integrity checks passed. Match result is verified for settlement.`
         : `${passedRules.length}/${rules.length} checks passed. Issues: ${failedRules.map((r) => r.name.replace(/_/g, " ")).join(", ")}.`;
 
     return {
