@@ -20,8 +20,11 @@ function dedupeMatches(matches: MatchResult[]): MatchResult[] {
   return Array.from(seen.values());
 }
 
-const llmCache = new Map<string, AgentOutput[]>();
+const llmResultCache = new Map<string, AgentOutput>();
 const llmInFlight = new Set<string>();
+const llmRetries = new Map<string, number>();
+
+const MAX_RETRIES = 2;
 
 function matchKey(home: string, away: string) {
   return `${home.toLowerCase()}|${away.toLowerCase()}`;
@@ -73,19 +76,17 @@ export async function GET() {
       );
 
       const key = matchKey(first.homeTeam, first.awayTeam);
-      const cachedLLM = llmCache.get(key) || [];
-      const pending = llmInFlight.has(key);
+      const cachedResult = llmResultCache.get(key);
+      const isPending = llmInFlight.has(key);
 
-      const allResults = [...fastResults, ...cachedLLM];
-      if (pending && cachedLLM.length === 0) {
+      const allResults = [...fastResults];
+      if (cachedResult) {
+        allResults.push(cachedResult);
+      } else if (isPending) {
         allResults.push({
           agentId: "llm-reasoning",
           agentName: "AI Reasoning Agent",
-          prediction: {
-            winner: first.homeTeam,
-            homeScore: null,
-            awayScore: null,
-          },
+          prediction: { winner: first.homeTeam, homeScore: null, awayScore: null },
           confidence: 0,
           explanation: "Analyzing...",
           evidence: [],
@@ -97,22 +98,23 @@ export async function GET() {
       enriched.push({
         ...first,
         consensus: computeAgentConsensus(allResults, canonicalState),
-        llmPending: pending,
+        llmPending: isPending,
       });
 
-      if (llmAgent && !llmInFlight.has(key) && !llmCache.has(key)) {
+      const retries = llmRetries.get(key) ?? 0;
+      if (llmAgent && !cachedResult && !isPending && retries < MAX_RETRIES) {
         llmInFlight.add(key);
-        llmAgent
-          .verify(canonicalState)
-          .then((llmResult) => {
-            llmCache.set(key, [llmResult]);
-          })
-          .catch(() => {
-            llmCache.set(key, []);
-          })
-          .finally(() => {
-            llmInFlight.delete(key);
-          });
+        llmRetries.set(key, retries + 1);
+
+        llmAgent.verify(canonicalState).then((llmResult) => {
+          const isFallback = llmResult.confidence === 0;
+          if (!isFallback) {
+            llmResultCache.set(key, llmResult);
+          } else if (retries + 1 >= MAX_RETRIES) {
+            llmResultCache.set(key, llmResult);
+          }
+          llmInFlight.delete(key);
+        });
       }
     }
 
