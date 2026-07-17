@@ -92,7 +92,12 @@ class FootballDataProvider implements Provider {
       return (res.data.matches || [])
         .filter((m: Record<string, unknown>) => {
           const sport = m.sport as string | undefined;
-          return !sport || sport.toLowerCase() === "football";
+          if (sport && sport.toLowerCase() !== "football") return false;
+          const home = m.homeTeam as Record<string, string> | undefined;
+          const away = m.awayTeam as Record<string, string> | undefined;
+          const teamStr = `${home?.name || ""} ${away?.name || ""}`.toLowerCase();
+          if (/\brugby\b|\bbasketball\b|\bbaseball\b|\bhockey\b|\bcricket\b/.test(teamStr)) return false;
+          return true;
         })
         .map((m: Record<string, unknown>) => {
           const home = m.homeTeam as Record<string, string> | undefined;
@@ -156,34 +161,48 @@ class TheSportsDBProvider implements Provider {
   async fetchMatches(): Promise<MatchResult[]> {
     return withRetry(async () => {
       const res = await axios.get(
-        `${this.metadata.baseUrl}/eventsseason.php?id=4551&s=2026`,
+        `${this.metadata.baseUrl}/eventsseason.php?id=4429&s=2026`,
         { timeout: DEFAULT_TIMEOUT }
       );
-      return (res.data.events || []).map(
-        (e: Record<string, unknown>) =>
-          ({
-            id: `${this.metadata.id}-${e.idEvent}`,
-            homeTeam: (e.strHomeTeam as string) || "Unknown",
-            awayTeam: (e.strAwayTeam as string) || "Unknown",
-            homeScore: e.intHomeScore
-              ? parseInt(e.intHomeScore as string, 10)
-              : null,
-            awayScore: e.intAwayScore
-              ? parseInt(e.intAwayScore as string, 10)
-              : null,
-            status:
-              e.strStatus === "Match Finished"
-                ? "FINISHED"
-                : e.strStatus === "1H" || e.strStatus === "2H"
-                  ? "LIVE"
-                  : "SCHEDULED",
-            matchDate: e.dateEvent
-              ? `${e.dateEvent}T${e.strTime || "00:00:00"}Z`
-              : new Date().toISOString(),
-            sport: "FOOTBALL" as const,
-            providerId: this.metadata.id,
-          }) as MatchResult
-      );
+      return (res.data.events || [])
+        .filter((e: Record<string, unknown>) => {
+          const sport = (e.strSport as string) || "";
+          const league = (e.strLeague as string) || "";
+          const isFootball =
+            sport.toLowerCase() === "soccer" ||
+            sport.toLowerCase() === "football" ||
+            league.toLowerCase().includes("world cup") ||
+            league.toLowerCase().includes("soccer");
+          if (!isFootball) return false;
+          const teamStr = `${e.strHomeTeam || ""} ${e.strAwayTeam || ""}`.toLowerCase();
+          if (/\brugby\b|\bbasketball\b|\bbaseball\b|\bhockey\b|\bcricket\b/.test(teamStr)) return false;
+          return true;
+        })
+        .map(
+          (e: Record<string, unknown>) =>
+            ({
+              id: `${this.metadata.id}-${e.idEvent}`,
+              homeTeam: (e.strHomeTeam as string) || "Unknown",
+              awayTeam: (e.strAwayTeam as string) || "Unknown",
+              homeScore: e.intHomeScore
+                ? parseInt(e.intHomeScore as string, 10)
+                : null,
+              awayScore: e.intAwayScore
+                ? parseInt(e.intAwayScore as string, 10)
+                : null,
+              status:
+                e.strStatus === "Match Finished"
+                  ? "FINISHED"
+                  : e.strStatus === "1H" || e.strStatus === "2H"
+                    ? "LIVE"
+                    : "SCHEDULED",
+              matchDate: e.dateEvent
+                ? `${e.dateEvent}T${e.strTime || "00:00:00"}Z`
+                : new Date().toISOString(),
+              sport: "FOOTBALL" as const,
+              providerId: this.metadata.id,
+            }) as MatchResult
+        );
     });
   }
 
@@ -191,7 +210,7 @@ class TheSportsDBProvider implements Provider {
     const start = Date.now();
     try {
       await axios.get(
-        `${this.metadata.baseUrl}/eventsseason.php?id=4551&s=2026`,
+        `${this.metadata.baseUrl}/eventsseason.php?id=4429&s=2026`,
         { timeout: DEFAULT_TIMEOUT }
       );
       return {
