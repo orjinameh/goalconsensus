@@ -24,6 +24,7 @@ export default function Home() {
   const [view, setView] = useState<ViewState>("landing");
   const [data, setData] = useState<MatchesResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingSlow, setLoadingSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentCount, setPaymentCount] = useState(0);
   const [result, setResult] = useState<{
@@ -49,13 +50,25 @@ export default function Home() {
   }, []);
 
   const loadData = useCallback(async () => {
+    setLoadingSlow(false);
     try {
-      const res = await fetchMatches();
-      setData(res);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const res = await fetch("/api/matches", {
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      });
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const json = await res.json();
+      setData(json);
       setError(null);
-    } catch {
-      setError("Could not load matches. Retrying...");
-      setTimeout(loadData, 10000);
+    } catch (e: unknown) {
+      const msg =
+        e instanceof DOMException && e.name === "AbortError"
+          ? "Request timed out. Server may be waking up."
+          : "Could not load matches.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -63,8 +76,10 @@ export default function Home() {
 
   useEffect(() => {
     loadData();
+    const slowTimer = setTimeout(() => setLoadingSlow(true), 5000);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      clearTimeout(slowTimer);
     };
   }, [loadData]);
 
@@ -313,10 +328,19 @@ export default function Home() {
           </div>
 
           {loading && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <MatchCardSkeleton key={i} />
-              ))}
+            <div>
+              {loadingSlow && (
+                <div className="text-center mb-4">
+                  <p className="text-xs text-text-muted">
+                    Server may be waking up — this can take up to 30 seconds on first load.
+                  </p>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <MatchCardSkeleton key={i} />
+                ))}
+              </div>
             </div>
           )}
 
@@ -362,7 +386,7 @@ export default function Home() {
               >
                 Research paper
               </a>
-              <span>MCP Server v2.0</span>
+              <span>MCP Server v2.1</span>
               <span>Injective Testnet</span>
             </div>
             <div className="flex items-center gap-1.5">

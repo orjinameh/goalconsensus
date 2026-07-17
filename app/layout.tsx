@@ -14,6 +14,25 @@ export const metadata: Metadata = {
     "Injective",
     "x402",
   ],
+  openGraph: {
+    title: "GoalConsensus — Multi-Agent Settlement Verification",
+    description:
+      "Verify football match results using 3 independent AI agents before prediction market settlement. Byzantine-inspired consensus.",
+    url: "https://goalconsensus.onrender.com",
+    siteName: "GoalConsensus",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "GoalConsensus — Settlement Verification",
+    description:
+      "Verify football match results using independent AI agents before prediction market settlement.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export const viewport: Viewport = {
