@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildCanonicalState } from "@/lib/providers";
-import { agents } from "@/lib/agents";
+import { getPrediction } from "@/lib/consensus-service";
 import { chargeX402, formatX402Header } from "@/lib/x402";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +15,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const canonicalState = await buildCanonicalState(
-      homeTeam,
-      awayTeam
-    );
+    const data = await getPrediction(homeTeam, awayTeam);
 
-    if (!canonicalState) {
+    if (!data.canonicalState) {
       const queryId = `predict-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const payment = chargeX402("get_match_prediction", queryId);
       return NextResponse.json({
@@ -33,23 +29,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const agentOutputs = await Promise.all(
-      agents.map((agent) => agent.verify(canonicalState))
-    );
-
     const queryId = `predict-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const payment = chargeX402("get_match_prediction", queryId);
 
     return NextResponse.json({
-      canonicalState,
-      agentOutputs,
+      ...data,
       payment,
       x402Header: formatX402Header(),
     });
   } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      canonicalState: null,
+      agentOutputs: [],
+      error: "AI reasoning is temporarily unavailable.",
+    });
   }
 }

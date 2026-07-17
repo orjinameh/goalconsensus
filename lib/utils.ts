@@ -44,7 +44,7 @@ export function relativeTime(iso: string): string {
 
 export function truncate(str: string, max: number): string {
   if (str.length <= max) return str;
-  return str.slice(0, max - 1) + "…";
+  return str.slice(0, max - 1) + "...";
 }
 
 export function debounce<T extends (...args: unknown[]) => unknown>(

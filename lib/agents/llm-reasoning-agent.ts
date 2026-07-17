@@ -1,29 +1,13 @@
-import Groq from "groq-sdk";
 import {
   VerificationAgent,
   CanonicalMatchState,
   AgentOutput,
   AgentEvidence,
 } from "./types";
-
-let groqClient: Groq | null = null;
-
-function getClient(): Groq {
-  if (!groqClient) {
-    groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY || "" });
-  }
-  return groqClient;
-}
-
-function getModelName(): string {
-  return process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-}
-
-const COOLDOWN_MS = 3000;
-let lastCallTime = 0;
+import { getLLMChain } from "../llm/chain";
 
 const llmCache = new Map<string, { result: AgentOutput; ts: number }>();
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function cacheKey(state: CanonicalMatchState): string {
   return `${state.homeTeam}-${state.awayTeam}-${state.status}-${state.homeScore ?? "x"}-${state.awayScore ?? "x"}`;
@@ -52,12 +36,12 @@ function fallbackOutput(
     },
     confidence: 0,
     explanation:
-      "LLM temporarily unavailable. Consensus continued using the remaining verification agents.",
+      "AI reasoning is temporarily unavailable. Consensus generated using available agents.",
     evidence: [
       {
         source: "llm-reasoning",
         detail:
-          "LLM unavailable — agent skipped, consensus uses remaining agents",
+          "AI reasoning unavailable — agent skipped, consensus uses remaining agents",
         weight: 0,
       },
     ],
@@ -92,53 +76,53 @@ export const llmReasoningAgent: VerificationAgent = {
       };
     }
 
-    if (!process.env.GROQ_API_KEY) {
-      return fallbackOutput(state, start);
-    }
-
     const key = cacheKey(state);
     const cached = llmCache.get(key);
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
       return { ...cached.result, latencyMs: Date.now() - start };
     }
 
-    const elapsed = Date.now() - lastCallTime;
-    if (elapsed < COOLDOWN_MS) {
-      await new Promise((r) =>
-        setTimeout(r, COOLDOWN_MS - elapsed)
-      );
-    }
-
     try {
-      const client = getClient();
-      const model = getModelName();
-      lastCallTime = Date.now();
+      const chain = getLLMChain();
 
-      const response = await client.chat.completions.create({
-        model,
-        temperature: 0.2,
-        max_tokens: 256,
+      const userContent = [
+        `Predict: ${state.homeTeam} vs ${state.awayTeam} (${state.status}).`,
+        state.homeScore !== null
+          ? `Score: ${state.homeTeam} ${state.homeScore}-${state.awayScore} ${state.awayTeam}.`
+          : "",
+        `Return ONLY valid JSON: {"winner":"team name","homeScore":0,"awayScore":0,"confidence":0,"reasoning":"brief analysis","keyFactors":["factor1","factor2","factor3"]}`,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      const chainResult = await chain.complete({
         messages: [
           {
             role: "system",
             content:
-              "You are a football match analyst. Respond only in valid JSON, no markdown.",
+              "You are a football match analyst. Respond only in valid JSON, no markdown, no code fences.",
           },
           {
             role: "user",
-            content: `Predict: ${state.homeTeam} vs ${state.awayTeam} (${state.status}).
-${state.homeScore !== null ? `Score: ${state.homeTeam} ${state.homeScore}-${state.awayScore} ${state.awayTeam}.` : ""}
-Return: {"winner":"team","homeScore":0,"awayScore":0,"confidence":0,"reasoning":"...","keyFactors":["...","...","..."]}`,
+            content: userContent,
           },
         ],
+        temperature: 0.2,
+        maxTokens: 256,
       });
 
-      const content =
-        response.choices[0]?.message?.content || "{}";
+      const content = chainResult.result.content || "{}";
       const cleaned = content
         .replace(/```json\n?|\n?```/g, "")
+        .replace(/^```[\s\S]*?```$/gm, "")
         .trim();
-      const parsed = JSON.parse(cleaned) as LLMResponse;
+
+      let parsed: LLMResponse;
+      try {
+        parsed = JSON.parse(cleaned) as LLMResponse;
+      } catch {
+        return fallbackOutput(state, start);
+      }
 
       const winner = parsed.winner || state.homeTeam;
       const confidence = Math.min(
@@ -161,18 +145,23 @@ Return: {"winner":"team","homeScore":0,"awayScore":0,"confidence":0,"reasoning":
         evidence: [
           {
             source: "llm-reasoning",
+            detail: `Provider: ${chainResult.providerUsed} | Model: ${chainResult.result.model}`,
+            weight: 0.1,
+          },
+          {
+            source: "llm-reasoning",
             detail: `Winner: ${winner}`,
             weight: 0.4,
           },
           {
             source: "llm-reasoning",
             detail: `Confidence: ${confidence}%`,
-            weight: 0.3,
+            weight: 0.25,
           },
           {
             source: "llm-reasoning",
             detail: `Score: ${parsed.homeScore}-${parsed.awayScore}`,
-            weight: 0.3,
+            weight: 0.25,
           },
         ],
         timestamp: new Date().toISOString(),
@@ -181,10 +170,7 @@ Return: {"winner":"team","homeScore":0,"awayScore":0,"confidence":0,"reasoning":
 
       llmCache.set(key, { result, ts: Date.now() });
       return result;
-    } catch (err) {
-      console.error(
-        `[llm-reasoning] ${err instanceof Error ? err.message : "unknown"}`
-      );
+    } catch {
       return fallbackOutput(state, start);
     }
   },

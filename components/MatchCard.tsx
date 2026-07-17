@@ -75,19 +75,26 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
     >
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 text-2xs font-medium px-2 py-0.5 rounded-full border",
-              verdict.bg,
-              verdict.color
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 text-2xs font-medium px-2 py-0.5 rounded-full border",
+                verdict.bg,
+                verdict.color
+              )}
+            >
+              <VerdictIcon size={10} />
+              {verdict.label}
+              {match.llmPending && (
+                <Loader2 size={8} className="animate-spin" />
+              )}
+            </span>
+            {match.competition && (
+              <span className="text-2xs text-text-muted">
+                {match.competition}
+              </span>
             )}
-          >
-            <VerdictIcon size={10} />
-            {verdict.label}
-            {match.llmPending && (
-              <Loader2 size={8} className="animate-spin" />
-            )}
-          </span>
+          </div>
           <div className="flex items-center gap-2">
             {live && (
               <span className="flex items-center gap-1 text-2xs text-accent-red">

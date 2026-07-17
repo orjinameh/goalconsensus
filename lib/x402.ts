@@ -39,7 +39,7 @@ export function chargeX402(
   toolName: string,
   queryId: string
 ): X402Receipt {
-  const receipt: X402Receipt = {
+  return {
     paid: true,
     amount: "0.001 USDC",
     protocol: "x402",
@@ -51,12 +51,6 @@ export function chargeX402(
     networkId: INJECTIVE_TESTNET_CHAIN_ID,
     fee_recipient: FEE_RECIPIENT,
   };
-
-  console.log(
-    `[x402] Charged ${receipt.amount} on ${receipt.chain} for ${toolName} | tx: ${receipt.txHash}`
-  );
-
-  return receipt;
 }
 
 export function formatX402Header(): string {

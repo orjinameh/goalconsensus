@@ -12,10 +12,12 @@ import { cn } from "@/lib/utils";
 import type { MatchWithConsensus } from "@/lib/api";
 
 const EXAMPLE_MATCHES = [
-  { home: "Argentina", away: "France" },
-  { home: "England", away: "Brazil" },
-  { home: "Spain", away: "Germany" },
-  { home: "Netherlands", away: "Portugal" },
+  { home: "Arsenal", away: "Chelsea", competition: "Premier League" },
+  { home: "Real Madrid", away: "Barcelona", competition: "La Liga" },
+  { home: "Liverpool", away: "Manchester City", competition: "Premier League" },
+  { home: "Bayern Munich", away: "Borussia Dortmund", competition: "Bundesliga" },
+  { home: "Inter Milan", away: "AC Milan", competition: "Serie A" },
+  { home: "Paris Saint-Germain", away: "Olympique Marseille", competition: "Ligue 1" },
 ];
 
 interface SearchBarProps {

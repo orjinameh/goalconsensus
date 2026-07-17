@@ -1,7 +1,5 @@
 import axios from "axios";
 
-const SUPPORTED_SPORTS = ["FOOTBALL"] as const;
-
 export interface MatchResult {
   id: string;
   homeTeam: string;
@@ -12,6 +10,7 @@ export interface MatchResult {
   matchDate: string;
   sport: "FOOTBALL";
   providerId: string;
+  competition?: string;
 }
 
 export interface ProviderMetadata {
@@ -44,6 +43,25 @@ export interface Provider {
 const DEFAULT_TIMEOUT = 8000;
 const DEFAULT_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
+
+const FOOTBALL_DATA_COMPETITIONS = [
+  "PL",
+  "CL",
+  "ELC",
+  "BL1",
+  "FL1",
+  "SA",
+  "PD",
+  "WC",
+  "EC",
+  "DED",
+  "BSA",
+  "EL",
+  "ECL",
+  "NationsLeague",
+  "CLI",
+  "MLS",
+];
 
 function normalizeTeamName(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z\s]/g, "");
@@ -80,57 +98,97 @@ class FootballDataProvider implements Provider {
     rateLimit: "10 req/min (free tier)",
   };
 
+  private matchCache: MatchResult[] | null = null;
+  private cacheTimestamp = 0;
+  private cacheTtlMs = 30_000;
+
   async fetchMatches(): Promise<MatchResult[]> {
-    return withRetry(async () => {
-      const res = await axios.get(
-        `${this.metadata.baseUrl}/competitions/WC/matches`,
-        {
-          headers: { "X-Auth-Token": process.env.FOOTBALL_DATA_API_KEY || "" },
-          timeout: DEFAULT_TIMEOUT,
+    const now = Date.now();
+    if (this.matchCache && now - this.cacheTimestamp < this.cacheTtlMs) {
+      return this.matchCache;
+    }
+
+    const apiKey = process.env.FOOTBALL_DATA_API_KEY || "";
+    if (!apiKey) return [];
+
+    const allMatches: MatchResult[] = [];
+    const seen = new Set<string>();
+
+    for (const comp of FOOTBALL_DATA_COMPETITIONS) {
+      try {
+        const res = await withRetry(async () => {
+          return axios.get(
+            `${this.metadata.baseUrl}/competitions/${comp}/matches`,
+            {
+              headers: { "X-Auth-Token": apiKey },
+              timeout: DEFAULT_TIMEOUT,
+              params: { status: "LIVE,SCHEDULED,FINISHED" },
+            }
+          );
+        }, 1, 500);
+
+        const matches = (res.data.matches || [])
+          .filter((m: Record<string, unknown>) => {
+            const sport = m.sport as string | undefined;
+            if (sport && sport.toLowerCase() !== "football") return false;
+            const home = m.homeTeam as Record<string, string> | undefined;
+            const away = m.awayTeam as Record<string, string> | undefined;
+            const teamStr = `${home?.name || ""} ${away?.name || ""}`.toLowerCase();
+            if (/\brugby\b|\bbasketball\b|\bbaseball\b|\bhockey\b|\bcricket\b/.test(teamStr)) return false;
+            return true;
+          })
+          .map((m: Record<string, unknown>) => {
+            const home = m.homeTeam as Record<string, string> | undefined;
+            const away = m.awayTeam as Record<string, string> | undefined;
+            const score = m.score as
+              | Record<string, Record<string, number>>
+              | undefined;
+            const fullTime = score?.fullTime;
+            let status: "SCHEDULED" | "LIVE" | "FINISHED" = "SCHEDULED";
+            if (m.status === "FINISHED") status = "FINISHED";
+            else if (m.status === "IN_PLAY" || m.status === "PAUSED")
+              status = "LIVE";
+
+            const competition = m.competition as Record<string, string> | undefined;
+
+            return {
+              id: `${this.metadata.id}-${m.id}`,
+              homeTeam: home?.name || "Unknown",
+              awayTeam: away?.name || "Unknown",
+              homeScore: fullTime?.home ?? null,
+              awayScore: fullTime?.away ?? null,
+              status,
+              matchDate: (m.utcDate as string) || new Date().toISOString(),
+              sport: "FOOTBALL" as const,
+              providerId: this.metadata.id,
+              competition: competition?.name || comp,
+            } as MatchResult;
+          });
+
+        for (const match of matches) {
+          const key = `${normalizeTeamName(match.homeTeam)}-${normalizeTeamName(match.awayTeam)}-${match.status}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            allMatches.push(match);
+          }
         }
-      );
-      return (res.data.matches || [])
-        .filter((m: Record<string, unknown>) => {
-          const sport = m.sport as string | undefined;
-          if (sport && sport.toLowerCase() !== "football") return false;
-          const home = m.homeTeam as Record<string, string> | undefined;
-          const away = m.awayTeam as Record<string, string> | undefined;
-          const teamStr = `${home?.name || ""} ${away?.name || ""}`.toLowerCase();
-          if (/\brugby\b|\bbasketball\b|\bbaseball\b|\bhockey\b|\bcricket\b/.test(teamStr)) return false;
-          return true;
-        })
-        .map((m: Record<string, unknown>) => {
-          const home = m.homeTeam as Record<string, string> | undefined;
-          const away = m.awayTeam as Record<string, string> | undefined;
-          const score = m.score as
-            | Record<string, Record<string, number>>
-            | undefined;
-          const fullTime = score?.fullTime;
-          let status: "SCHEDULED" | "LIVE" | "FINISHED" = "SCHEDULED";
-          if (m.status === "FINISHED") status = "FINISHED";
-          else if (m.status === "IN_PLAY" || m.status === "PAUSED")
-            status = "LIVE";
-          return {
-            id: `${this.metadata.id}-${m.id}`,
-            homeTeam: home?.name || "Unknown",
-            awayTeam: away?.name || "Unknown",
-            homeScore: fullTime?.home ?? null,
-            awayScore: fullTime?.away ?? null,
-            status,
-            matchDate: (m.utcDate as string) || new Date().toISOString(),
-            sport: "FOOTBALL" as const,
-            providerId: this.metadata.id,
-          } as MatchResult;
-        });
-    });
+      } catch {
+        continue;
+      }
+    }
+
+    this.matchCache = allMatches;
+    this.cacheTimestamp = now;
+    return allMatches;
   }
 
   async healthCheck(): Promise<ProviderHealth> {
     const start = Date.now();
     try {
-      await axios.get(`${this.metadata.baseUrl}/competitions/WC/matches`, {
+      await axios.get(`${this.metadata.baseUrl}/competitions/PL/matches`, {
         headers: { "X-Auth-Token": process.env.FOOTBALL_DATA_API_KEY || "" },
         timeout: DEFAULT_TIMEOUT,
+        params: { status: "LIVE,SCHEDULED,FINISHED" },
       });
       return {
         providerId: this.metadata.id,
@@ -150,6 +208,19 @@ class FootballDataProvider implements Provider {
   }
 }
 
+const THESPORTSDB_LEAGUES: Array<{ id: string; name: string }> = [
+  { id: "4429", name: "FIFA World Cup" },
+  { id: "4328", name: "English Premier League" },
+  { id: "4335", name: "Spanish La Liga" },
+  { id: "4334", name: "French Ligue 1" },
+  { id: "4331", name: "German Bundesliga" },
+  { id: "4332", name: "Italian Serie A" },
+  { id: "4339", name: "Dutch Eredivisie" },
+  { id: "4340", name: "Champions League" },
+  { id: "4344", name: "Copa Libertadores" },
+  { id: "4380", name: "MLS" },
+];
+
 class TheSportsDBProvider implements Provider {
   metadata: ProviderMetadata = {
     id: "thesportsdb",
@@ -158,59 +229,89 @@ class TheSportsDBProvider implements Provider {
     rateLimit: "30 req/min (free tier)",
   };
 
+  private matchCache: MatchResult[] | null = null;
+  private cacheTimestamp = 0;
+  private cacheTtlMs = 30_000;
+
   async fetchMatches(): Promise<MatchResult[]> {
-    return withRetry(async () => {
-      const res = await axios.get(
-        `${this.metadata.baseUrl}/eventsseason.php?id=4429&s=2026`,
-        { timeout: DEFAULT_TIMEOUT }
-      );
-      return (res.data.events || [])
-        .filter((e: Record<string, unknown>) => {
-          const sport = (e.strSport as string) || "";
-          const league = (e.strLeague as string) || "";
-          const isFootball =
-            sport.toLowerCase() === "soccer" ||
-            sport.toLowerCase() === "football" ||
-            league.toLowerCase().includes("world cup") ||
-            league.toLowerCase().includes("soccer");
-          if (!isFootball) return false;
-          const teamStr = `${e.strHomeTeam || ""} ${e.strAwayTeam || ""}`.toLowerCase();
-          if (/\brugby\b|\bbasketball\b|\bbaseball\b|\bhockey\b|\bcricket\b/.test(teamStr)) return false;
-          return true;
-        })
-        .map(
-          (e: Record<string, unknown>) =>
-            ({
-              id: `${this.metadata.id}-${e.idEvent}`,
-              homeTeam: (e.strHomeTeam as string) || "Unknown",
-              awayTeam: (e.strAwayTeam as string) || "Unknown",
-              homeScore: e.intHomeScore
-                ? parseInt(e.intHomeScore as string, 10)
-                : null,
-              awayScore: e.intAwayScore
-                ? parseInt(e.intAwayScore as string, 10)
-                : null,
-              status:
-                e.strStatus === "Match Finished"
-                  ? "FINISHED"
-                  : e.strStatus === "1H" || e.strStatus === "2H"
-                    ? "LIVE"
-                    : "SCHEDULED",
-              matchDate: e.dateEvent
-                ? `${e.dateEvent}T${e.strTime || "00:00:00"}Z`
-                : new Date().toISOString(),
-              sport: "FOOTBALL" as const,
-              providerId: this.metadata.id,
-            }) as MatchResult
-        );
-    });
+    const now = Date.now();
+    if (this.matchCache && now - this.cacheTimestamp < this.cacheTtlMs) {
+      return this.matchCache;
+    }
+
+    const allMatches: MatchResult[] = [];
+    const seen = new Set<string>();
+
+    for (const league of THESPORTSDB_LEAGUES) {
+      try {
+        const year = new Date().getFullYear();
+        const res = await withRetry(async () => {
+          return axios.get(
+            `${this.metadata.baseUrl}/eventsseason.php?id=${league.id}&s=${year}`,
+            { timeout: DEFAULT_TIMEOUT }
+          );
+        }, 1, 500);
+
+        const events = (res.data.events || [])
+          .filter((e: Record<string, unknown>) => {
+            const sport = (e.strSport as string) || "";
+            const isFootball =
+              sport.toLowerCase() === "soccer" ||
+              sport.toLowerCase() === "football";
+            if (!isFootball) return false;
+            const teamStr = `${e.strHomeTeam || ""} ${e.strAwayTeam || ""}`.toLowerCase();
+            if (/\brugby\b|\bbasketball\b|\bbaseball\b|\bhockey\b|\bcricket\b/.test(teamStr)) return false;
+            return true;
+          })
+          .map(
+            (e: Record<string, unknown>) =>
+              ({
+                id: `${this.metadata.id}-${e.idEvent}`,
+                homeTeam: (e.strHomeTeam as string) || "Unknown",
+                awayTeam: (e.strAwayTeam as string) || "Unknown",
+                homeScore: e.intHomeScore
+                  ? parseInt(e.intHomeScore as string, 10)
+                  : null,
+                awayScore: e.intAwayScore
+                  ? parseInt(e.intAwayScore as string, 10)
+                  : null,
+                status:
+                  e.strStatus === "Match Finished"
+                    ? "FINISHED"
+                    : e.strStatus === "1H" || e.strStatus === "2H"
+                      ? "LIVE"
+                      : "SCHEDULED",
+                matchDate: e.dateEvent
+                  ? `${e.dateEvent}T${e.strTime || "00:00:00"}Z`
+                  : new Date().toISOString(),
+                sport: "FOOTBALL" as const,
+                providerId: this.metadata.id,
+                competition: league.name,
+              }) as MatchResult
+          );
+
+        for (const match of events) {
+          const key = `${normalizeTeamName(match.homeTeam)}-${normalizeTeamName(match.awayTeam)}-${match.status}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            allMatches.push(match);
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    this.matchCache = allMatches;
+    this.cacheTimestamp = now;
+    return allMatches;
   }
 
   async healthCheck(): Promise<ProviderHealth> {
     const start = Date.now();
     try {
       await axios.get(
-        `${this.metadata.baseUrl}/eventsseason.php?id=4429&s=2026`,
+        `${this.metadata.baseUrl}/eventsseason.php?id=4328&s=${new Date().getFullYear()}`,
         { timeout: DEFAULT_TIMEOUT }
       );
       return {
@@ -326,13 +427,6 @@ export async function buildCanonicalState(
   };
 }
 
-export function isUnsupportedSport(
-  _homeTeam: string,
-  _awayTeam: string
-): boolean {
-  return false;
-}
-
 export function getSupportedSports(): readonly string[] {
-  return SUPPORTED_SPORTS;
+  return ["FOOTBALL"] as const;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Shield, ArrowRight, Zap, Lock, GitBranch } from "lucide-react";
+import { Shield, ArrowRight, Zap, Lock, GitBranch, Globe, Trophy } from "lucide-react";
 import { Header } from "@/components/Header";
 import { SearchBar } from "@/components/SearchBar";
 import { MatchCard } from "@/components/MatchCard";
@@ -90,10 +90,10 @@ export default function Home() {
       { id: "providers", label: "Querying Data Providers", status: "pending" },
       { id: "canonical", label: "Building Canonical Match State", status: "pending" },
       { id: "statistical", label: "Running Statistical Agent", status: "pending" },
-      { id: "llm", label: "Running LLM Reasoning Agent", status: "pending" },
-      { id: "rules", label: "Running Deterministic Rules Agent", status: "pending" },
+      { id: "llm", label: "Generating AI Tactical Reasoning", status: "pending" },
+      { id: "rules", label: "Running Deterministic Checks", status: "pending" },
       { id: "consensus", label: "Building Consensus", status: "pending" },
-      { id: "settlement", label: "Settlement Recommendation Ready", status: "pending" },
+      { id: "settlement", label: "Preparing Recommendation", status: "pending" },
     ];
     setVerificationSteps(steps);
 
@@ -106,7 +106,7 @@ export default function Home() {
     setVerificationSteps((prev) =>
       prev.map((s) =>
         s.id === "providers"
-          ? { ...s, status: "completed", latencyMs: 600, detail: "football-data.org, TheSportsDB" }
+          ? { ...s, status: "completed", latencyMs: 600, detail: "Cross-referencing providers" }
           : s.id === "canonical"
             ? { ...s, status: "active" }
             : s
@@ -117,7 +117,7 @@ export default function Home() {
     setVerificationSteps((prev) =>
       prev.map((s) =>
         s.id === "canonical"
-          ? { ...s, status: "completed", latencyMs: 400, detail: "Cross-referenced data from 2 providers" }
+          ? { ...s, status: "completed", latencyMs: 400, detail: "Match state confirmed" }
           : s.id === "statistical"
             ? { ...s, status: "active" }
             : s
@@ -141,14 +141,16 @@ export default function Home() {
               ...s,
               status: "completed",
               latencyMs: res.agentOutputs.find((a) => a.agentId === "llm-reasoning")?.latencyMs || 0,
-              detail: `LLM analysis complete`,
+              detail: res.agentOutputs.find((a) => a.agentId === "llm-reasoning")?.confidence === 0
+                ? "AI reasoning unavailable, skipped"
+                : `AI tactical analysis complete`,
             };
           if (s.id === "rules")
             return {
               ...s,
               status: "completed",
               latencyMs: res.agentOutputs.find((a) => a.agentId === "deterministic-rules")?.latencyMs || 0,
-              detail: `7 rule checks passed`,
+              detail: `7 data integrity checks`,
             };
           if (s.id === "consensus")
             return {
@@ -181,7 +183,7 @@ export default function Home() {
     } catch {
       setVerificationSteps((prev) =>
         prev.map((s) =>
-          s.status === "active"
+          s.status === "active" || s.status === "pending"
             ? { ...s, status: "error", detail: "Request failed. Please try again." }
             : s
         )
@@ -218,7 +220,7 @@ export default function Home() {
           <div className="max-w-xl mx-auto">
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-text-primary mb-1">
-                Verifying Settlement
+                Analyzing Match
               </h2>
               <p className="text-sm text-text-tertiary">
                 Running multi-agent verification pipeline...
@@ -238,26 +240,23 @@ export default function Home() {
       <Header paymentCount={paymentCount} />
 
       <main className="px-5">
-        {/* Hero Section */}
         <section className="max-w-3xl mx-auto pt-16 sm:pt-24 pb-12 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-accent-green-dim border border-accent-green/10 rounded-full text-2xs text-accent-green font-medium mb-6">
             <Shield size={12} />
-            Multi-Agent Verification Engine
+            Multi-Agent Intelligence Platform
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-text-primary mb-4 text-balance">
             GoalConsensus
           </h1>
           <p className="text-xl sm:text-2xl font-medium text-text-secondary mb-3">
-            Multi-Agent Settlement Verification
+            Football Intelligence Platform
           </p>
           <p className="text-sm text-text-tertiary max-w-xl mx-auto leading-relaxed mb-10">
-            Verify football match results using independent verification agents
-            before prediction market settlement. Three agents. Byzantine consensus.
-            Trustless verification.
+            Predict and verify football match results across every competition using
+            3 independent AI agents. Byzantine consensus. Trustless verification.
           </p>
 
-          {/* Search */}
           <div className="max-w-xl mx-auto">
             <SearchBar
               matches={data?.matches || []}
@@ -266,13 +265,12 @@ export default function Home() {
             />
           </div>
 
-          {/* Quick Examples */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
             <span className="text-2xs text-text-muted mr-1">Try:</span>
             {[
-              { home: "Argentina", away: "France" },
-              { home: "England", away: "Brazil" },
-              { home: "Spain", away: "Germany" },
+              { home: "Arsenal", away: "Chelsea" },
+              { home: "Real Madrid", away: "Barcelona" },
+              { home: "Liverpool", away: "Manchester City" },
             ].map((ex) => (
               <button
                 key={`${ex.home}-${ex.away}`}
@@ -285,17 +283,17 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Architecture Strip */}
         <section className="max-w-3xl mx-auto pb-12">
           <div className="flex items-center justify-center gap-2 sm:gap-4 text-2xs text-text-muted overflow-x-auto no-scrollbar py-2">
             {[
+              { icon: <Globe size={10} />, label: "All Competitions" },
               { icon: <Zap size={10} />, label: "2 Providers" },
               { icon: <GitBranch size={10} />, label: "Canonical State" },
-              { icon: <Shield size={10} />, label: "3 Agents" },
+              { icon: <Shield size={10} />, label: "3 AI Agents" },
               { icon: <Lock size={10} />, label: "BFT Consensus" },
             ].map((item, i) => (
               <div key={item.label} className="flex items-center gap-2 shrink-0">
-                {i > 0 && <span className="text-text-muted">→</span>}
+                {i > 0 && <span className="text-text-muted">&rarr;</span>}
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-3 border border-border-subtle rounded-md">
                   {item.icon}
                   <span>{item.label}</span>
@@ -305,15 +303,14 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Matches Dashboard */}
         <section className="max-w-4xl mx-auto pb-16">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-semibold text-text-primary">
-                Recent Matches
+                Live Matches
               </h2>
               <p className="text-2xs text-text-muted mt-0.5">
-                Football matches with verification status
+                Football matches across all competitions with AI analysis
               </p>
             </div>
             {data && (
@@ -332,7 +329,7 @@ export default function Home() {
               {loadingSlow && (
                 <div className="text-center mb-4">
                   <p className="text-xs text-text-muted">
-                    Server may be waking up — this can take up to 30 seconds on first load.
+                    Server may be waking up -- this can take up to 30 seconds on first load.
                   </p>
                 </div>
               )}
@@ -356,7 +353,7 @@ export default function Home() {
           {!loading && !error && data && data.matches.length === 0 && (
             <EmptyState
               title="No matches available"
-              description="Matches will appear here when football data providers have active fixtures. You can still verify any match using the search above."
+              description="Matches will appear here when football data providers have active fixtures. You can still analyze any match using the search above."
               icon="shield"
             />
           )}
@@ -374,7 +371,6 @@ export default function Home() {
           )}
         </section>
 
-        {/* Footer */}
         <footer className="max-w-4xl mx-auto border-t border-border-subtle py-8 mb-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-2xs text-text-muted">
             <div className="flex items-center gap-4">
@@ -386,8 +382,8 @@ export default function Home() {
               >
                 Research paper
               </a>
-              <span>MCP Server v2.1</span>
-              <span>Injective Testnet</span>
+              <span>MCP Server v3.0</span>
+              <span>x402 Protocol</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="status-dot status-dot-green" />

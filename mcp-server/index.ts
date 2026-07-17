@@ -5,138 +5,31 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import {
-  fetchAllProviders,
-  fetchMatchesForPair,
-  buildCanonicalState,
-} from "../lib/providers.js";
-import { agents } from "../lib/agents/index.js";
-import { computeAgentConsensus } from "../lib/consensus.js";
+  getConsensus,
+  getPrediction,
+  getMatches,
+  verifySettlement,
+} from "../lib/consensus-service.js";
 import { chargeX402, formatX402Header } from "../lib/x402.js";
-import type { CanonicalMatchState } from "../lib/agents/types.js";
 
 const server = new McpServer({
   name: "goalconsensus",
-  version: "2.1.0",
+  version: "3.0.0",
 });
 
 server.tool(
-  "get_consensus_result",
-  "Get multi-agent consensus for a football match. Canonical state from 2 providers, verified by 3 independent agents (Statistical, LLM Reasoning, Deterministic Rules) with Byzantine-inspired consensus voting. Returns settlement decision, confidence score, agent agreement, minority opinion, full evidence chain, and x402 payment receipt.",
+  "predict_match",
+  "Predict a football match result using 3 independent AI agents (Statistical, LLM Reasoning, Deterministic Rules) with Byzantine-inspired consensus. Returns winner, score, confidence, reasoning, and evidence chain.",
   {
-    homeTeam: z.string().describe("Home team name (e.g. Argentina, France, Brazil)"),
-    awayTeam: z.string().describe("Away team name (e.g. France, Argentina, Germany)"),
+    homeTeam: z.string().describe("Home team name (e.g. Argentina, Arsenal, Real Madrid)"),
+    awayTeam: z.string().describe("Away team name (e.g. France, Chelsea, Barcelona)"),
   },
   async ({ homeTeam, awayTeam }) => {
-    const canonicalState = await buildCanonicalState(homeTeam, awayTeam);
+    const data = await getPrediction(homeTeam, awayTeam);
+    const queryId = `mcp-predict-${Date.now()}`;
+    const payment = chargeX402("predict_match", queryId);
 
-    if (!canonicalState) {
-      const queryId = `mcp-consensus-${Date.now()}`;
-      const payment = chargeX402("get_consensus_result", queryId);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              status: "INSUFFICIENT_DATA",
-              match: `${homeTeam} vs ${awayTeam}`,
-              reason: "No canonical match state available. Both providers returned no data for this fixture.",
-              settlementDecision: "INSUFFICIENT_DATA",
-              confidence: 0,
-              agreement: 0,
-              totalAgents: 0,
-              agents: [],
-              evidence: [],
-              payment,
-            }, null, 2),
-          },
-        ],
-      };
-    }
-
-    if (canonicalState.sport !== "FOOTBALL") {
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              status: "UNSUPPORTED_SPORT",
-              sport: canonicalState.sport,
-              reason: "GoalConsensus only supports football. All verification agents reject non-football sports.",
-            }, null, 2),
-          },
-        ],
-      };
-    }
-
-    const agentOutputs = await Promise.all(
-      agents.map((agent) => agent.verify(canonicalState))
-    );
-
-    const consensus = computeAgentConsensus(agentOutputs, canonicalState);
-    const queryId = `mcp-consensus-${Date.now()}`;
-    const payment = chargeX402("get_consensus_result", queryId);
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            match: `${canonicalState.homeTeam} vs ${canonicalState.awayTeam}`,
-            canonicalState: {
-              homeTeam: canonicalState.homeTeam,
-              awayTeam: canonicalState.awayTeam,
-              homeScore: canonicalState.homeScore,
-              awayScore: canonicalState.awayScore,
-              status: canonicalState.status,
-              providerAgreement: canonicalState.providerAgreement,
-              providerCount: canonicalState.providerCount,
-            },
-            settlementDecision: consensus.settlementDecision,
-            finalPrediction: consensus.finalPrediction,
-            confidence: consensus.confidence,
-            agreement: `${consensus.agreement}/${consensus.totalAgents}`,
-            minorityOpinion: consensus.minorityOpinion
-              ? {
-                  agent: consensus.minorityOpinion.agentName,
-                  predicted: consensus.minorityOpinion.prediction.winner,
-                  confidence: consensus.minorityOpinion.confidence,
-                }
-              : null,
-            agents: agentOutputs.map((a) => ({
-              name: a.agentName,
-              prediction: a.prediction,
-              confidence: a.confidence,
-              latencyMs: a.latencyMs,
-              explanation: a.explanation,
-            })),
-            evidence: consensus.evidence.map((e) => ({
-              source: e.source,
-              detail: e.detail,
-              weight: e.weight,
-            })),
-            reasoning: consensus.reasoning,
-            payment,
-            x402Header: formatX402Header(),
-          }, null, 2),
-        },
-      ],
-    };
-  }
-);
-
-server.tool(
-  "get_match_prediction",
-  "Get individual predictions from all 3 verification agents for a football match. Returns Statistical (Poisson + Monte Carlo), LLM Reasoning (Groq), and Deterministic Rules agent outputs with evidence chains.",
-  {
-    homeTeam: z.string().describe("Home team name"),
-    awayTeam: z.string().describe("Away team name"),
-  },
-  async ({ homeTeam, awayTeam }) => {
-    const canonicalState = await buildCanonicalState(homeTeam, awayTeam);
-
-    if (!canonicalState) {
-      const queryId = `mcp-predict-${Date.now()}`;
-      const payment = chargeX402("get_match_prediction", queryId);
+    if (!data.canonicalState) {
       return {
         content: [
           {
@@ -153,25 +46,18 @@ server.tool(
       };
     }
 
-    const agentOutputs = await Promise.all(
-      agents.map((agent) => agent.verify(canonicalState))
-    );
-
-    const queryId = `mcp-predict-${Date.now()}`;
-    const payment = chargeX402("get_match_prediction", queryId);
-
     return {
       content: [
         {
           type: "text",
           text: JSON.stringify({
-            match: `${canonicalState.homeTeam} vs ${canonicalState.awayTeam}`,
+            match: `${data.canonicalState.homeTeam} vs ${data.canonicalState.awayTeam}`,
             canonicalState: {
-              status: canonicalState.status,
-              homeScore: canonicalState.homeScore,
-              awayScore: canonicalState.awayScore,
+              status: data.canonicalState.status,
+              homeScore: data.canonicalState.homeScore,
+              awayScore: data.canonicalState.awayScore,
             },
-            agents: agentOutputs.map((a) => ({
+            agents: data.agentOutputs.map((a) => ({
               id: a.agentId,
               name: a.agentName,
               prediction: a.prediction,
@@ -193,74 +79,90 @@ server.tool(
 );
 
 server.tool(
+  "verify_result",
+  "Verify a football match result for on-chain settlement using multi-agent consensus. Searches by team name. Returns settlement decision, confidence, agent agreement, and evidence chain.",
+  {
+    homeTeam: z.string().describe("Home team name"),
+    awayTeam: z.string().describe("Away team name"),
+  },
+  async ({ homeTeam, awayTeam }) => {
+    const data = await getConsensus(homeTeam, awayTeam);
+    const queryId = `mcp-consensus-${Date.now()}`;
+    const payment = chargeX402("verify_result", queryId);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            match: `${data.consensus.canonicalState.homeTeam} vs ${data.consensus.canonicalState.awayTeam}`,
+            canonicalState: {
+              homeTeam: data.consensus.canonicalState.homeTeam,
+              awayTeam: data.consensus.canonicalState.awayTeam,
+              homeScore: data.consensus.canonicalState.homeScore,
+              awayScore: data.consensus.canonicalState.awayScore,
+              status: data.consensus.canonicalState.status,
+              providerAgreement: data.consensus.canonicalState.providerAgreement,
+              providerCount: data.consensus.canonicalState.providerCount,
+            },
+            settlementDecision: data.consensus.settlementDecision,
+            finalPrediction: data.consensus.finalPrediction,
+            confidence: data.consensus.confidence,
+            agreement: `${data.consensus.agreement}/${data.consensus.totalAgents}`,
+            minorityOpinion: data.consensus.minorityOpinion
+              ? {
+                  agent: data.consensus.minorityOpinion.agentName,
+                  predicted: data.consensus.minorityOpinion.prediction.winner,
+                  confidence: data.consensus.minorityOpinion.confidence,
+                }
+              : null,
+            agents: data.agentOutputs.map((a) => ({
+              name: a.agentName,
+              prediction: a.prediction,
+              confidence: a.confidence,
+              latencyMs: a.latencyMs,
+              explanation: a.explanation,
+            })),
+            evidence: data.consensus.evidence.map((e) => ({
+              source: e.source,
+              detail: e.detail,
+              weight: e.weight,
+            })),
+            reasoning: data.consensus.reasoning,
+            payment,
+            x402Header: formatX402Header(),
+          }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
   "get_live_matches",
-  "Get all current football matches with multi-agent consensus status. Returns match scores, settlement decisions, confidence scores, and agent agreement counts. Free endpoint — no x402 charge.",
+  "Get all current football matches across all competitions with multi-agent consensus status. Returns match scores, settlement decisions, confidence scores, and agent agreement counts. Free endpoint.",
   {},
   async () => {
-    const providerResults = await fetchAllProviders();
-    const allMatches = providerResults
-      .flatMap((pr) => pr.matches)
-      .filter((m) => m.sport === "FOOTBALL");
+    const data = await getMatches();
 
-    const grouped = new Map<string, typeof allMatches>();
-    for (const m of allMatches) {
-      const key = `${m.homeTeam.toLowerCase()}-${m.awayTeam.toLowerCase()}`;
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key)!.push(m);
-    }
+    const matches = data.matches.map((m) => ({
+      homeTeam: m.homeTeam,
+      awayTeam: m.awayTeam,
+      homeScore: m.homeScore,
+      awayScore: m.awayScore,
+      status: m.status,
+      competition: m.competition,
+      settlementDecision: m.consensus?.settlementDecision || "PENDING",
+      confidence: m.consensus?.confidence || 0,
+      agreement: m.consensus
+        ? `${m.consensus.agreement}/${m.consensus.totalAgents}`
+        : "0/0",
+    }));
 
-    const matches: Array<{
-      homeTeam: string;
-      awayTeam: string;
-      homeScore: number | null;
-      awayScore: number | null;
-      status: string;
-      settlementDecision: string;
-      confidence: number;
-      agreement: string;
-    }> = [];
-
-    for (const [, group] of grouped) {
-      const first = group[0];
-      const responding = providerResults.filter(
-        (pr) => pr.health.available
-      );
-
-      const canonicalState: CanonicalMatchState = {
-        homeTeam: first.homeTeam,
-        awayTeam: first.awayTeam,
-        homeScore: first.homeScore,
-        awayScore: first.awayScore,
-        status: first.status,
-        matchDate: first.matchDate,
-        sport: "FOOTBALL",
-        providerAgreement: responding.length >= 2,
-        providerCount: responding.length,
-        providerHealth: providerResults.map((pr) => pr.health),
-        rawResults: group,
-      };
-
-      const agentOutputs = await Promise.all(
-        agents.map((agent) => agent.verify(canonicalState))
-      );
-      const consensus = computeAgentConsensus(agentOutputs, canonicalState);
-
-      matches.push({
-        homeTeam: first.homeTeam,
-        awayTeam: first.awayTeam,
-        homeScore: first.homeScore,
-        awayScore: first.awayScore,
-        status: first.status,
-        settlementDecision: consensus.settlementDecision,
-        confidence: consensus.confidence,
-        agreement: `${consensus.agreement}/${consensus.totalAgents}`,
-      });
-    }
-
-    const providerHealth = providerResults.map((pr) => ({
-      id: pr.providerId,
-      available: pr.health.available,
-      latencyMs: pr.health.latencyMs,
+    const providerHealth = data.providerHealth.map((p) => ({
+      id: p.providerId,
+      available: p.available,
+      latencyMs: p.latencyMs,
     }));
 
     return {
@@ -270,7 +172,7 @@ server.tool(
           text: JSON.stringify({
             matches,
             providerHealth,
-            fetchedAt: new Date().toISOString(),
+            fetchedAt: data.fetchedAt,
           }, null, 2),
         },
       ],
@@ -279,99 +181,89 @@ server.tool(
 );
 
 server.tool(
-  "verify_settlement",
-  "Check whether a football match result is safe for on-chain settlement using multi-agent consensus. Searches by team name or match ID. Returns boolean settlement safety, full consensus details, and x402 payment receipt.",
+  "get_consensus",
+  "Get full multi-agent consensus for a specific football match. Returns canonical state, settlement decision, confidence, agent agreement, minority opinion, evidence chain, and reasoning.",
   {
-    matchId: z.string().describe("Match ID, team name, or 'Home vs Away' string"),
+    homeTeam: z.string().describe("Home team name"),
+    awayTeam: z.string().describe("Away team name"),
   },
-  async ({ matchId }) => {
-    const providerResults = await fetchAllProviders();
-    const allMatches = providerResults
-      .flatMap((pr) => pr.matches)
-      .filter((m) => m.sport === "FOOTBALL");
-
-    const matching = allMatches.filter(
-      (m) =>
-        m.id.includes(matchId) ||
-        m.homeTeam.toLowerCase().includes(matchId.toLowerCase()) ||
-        m.awayTeam.toLowerCase().includes(matchId.toLowerCase()) ||
-        `${m.homeTeam} vs ${m.awayTeam}`.toLowerCase().includes(matchId.toLowerCase())
-    );
-
-    if (matching.length === 0) {
-      const queryId = `mcp-settle-${Date.now()}`;
-      const payment = chargeX402("verify_settlement", queryId);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              safeForSettlement: false,
-              match: matchId,
-              reason: `No matching football data found for "${matchId}".`,
-              payment,
-            }, null, 2),
-          },
-        ],
-      };
-    }
-
-    const first = matching[0];
-    const responding = providerResults.filter((pr) => pr.health.available);
-
-    const canonicalState: CanonicalMatchState = {
-      homeTeam: first.homeTeam,
-      awayTeam: first.awayTeam,
-      homeScore: first.homeScore,
-      awayScore: first.awayScore,
-      status: first.status,
-      matchDate: first.matchDate,
-      sport: "FOOTBALL",
-      providerAgreement: responding.length >= 2,
-      providerCount: responding.length,
-      providerHealth: providerResults.map((pr) => pr.health),
-      rawResults: matching,
-    };
-
-    const agentOutputs = await Promise.all(
-      agents.map((agent) => agent.verify(canonicalState))
-    );
-    const consensus = computeAgentConsensus(agentOutputs, canonicalState);
-    const safe = consensus.settlementDecision === "SETTLE";
-
-    const queryId = `mcp-settle-${Date.now()}`;
-    const payment = chargeX402("verify_settlement", queryId);
+  async ({ homeTeam, awayTeam }) => {
+    const data = await getConsensus(homeTeam, awayTeam);
+    const queryId = `mcp-consensus-${Date.now()}`;
+    const payment = chargeX402("get_consensus", queryId);
 
     return {
       content: [
         {
           type: "text",
           text: JSON.stringify({
-            safeForSettlement: safe,
-            match: `${canonicalState.homeTeam} vs ${canonicalState.awayTeam}`,
-            score: `${canonicalState.homeScore ?? "?"} - ${canonicalState.awayScore ?? "?"}`,
-            settlementDecision: consensus.settlementDecision,
-            confidence: consensus.confidence,
-            agreement: `${consensus.agreement}/${consensus.totalAgents}`,
-            canonicalResult: {
-              homeTeam: canonicalState.homeTeam,
-              awayTeam: canonicalState.awayTeam,
-              homeScore: canonicalState.homeScore,
-              awayScore: canonicalState.awayScore,
-              status: canonicalState.status,
-              providerAgreement: canonicalState.providerAgreement,
+            match: `${data.consensus.canonicalState.homeTeam} vs ${data.consensus.canonicalState.awayTeam}`,
+            canonicalState: {
+              homeTeam: data.consensus.canonicalState.homeTeam,
+              awayTeam: data.consensus.canonicalState.awayTeam,
+              homeScore: data.consensus.canonicalState.homeScore,
+              awayScore: data.consensus.canonicalState.awayScore,
+              status: data.consensus.canonicalState.status,
+              providerAgreement: data.consensus.canonicalState.providerAgreement,
+              providerCount: data.consensus.canonicalState.providerCount,
             },
-            agents: agentOutputs.map((a) => ({
+            settlementDecision: data.consensus.settlementDecision,
+            finalPrediction: data.consensus.finalPrediction,
+            confidence: data.consensus.confidence,
+            agreement: `${data.consensus.agreement}/${data.consensus.totalAgents}`,
+            minorityOpinion: data.consensus.minorityOpinion
+              ? {
+                  agent: data.consensus.minorityOpinion.agentName,
+                  predicted: data.consensus.minorityOpinion.prediction.winner,
+                  confidence: data.consensus.minorityOpinion.confidence,
+                }
+              : null,
+            agents: data.agentOutputs.map((a) => ({
               name: a.agentName,
               prediction: a.prediction,
               confidence: a.confidence,
+              latencyMs: a.latencyMs,
+              explanation: a.explanation,
             })),
-            reasoning: consensus.reasoning,
-            recommendation: safe
-              ? "This result has passed multi-agent Byzantine consensus. Safe to settle prediction market bets."
-              : "DO NOT SETTLE. This result has NOT passed multi-agent consensus. Wait for more data or manual verification.",
+            evidence: data.consensus.evidence.map((e) => ({
+              source: e.source,
+              detail: e.detail,
+              weight: e.weight,
+            })),
+            reasoning: data.consensus.reasoning,
             payment,
             x402Header: formatX402Header(),
+          }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "team_analysis",
+  "Get team analysis including dynamic ELO rating, attack/defense strength, and recent form for any football team.",
+  {
+    team: z.string().describe("Team name (e.g. Arsenal, Real Madrid, Brazil)"),
+  },
+  async ({ team }) => {
+    const { getTeamRating, getHeadToHeadModifier } = await import("../lib/team-ratings.js");
+    const rating = getTeamRating(team);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            team: rating.team,
+            rating: rating.rating,
+            elo: rating.elo,
+            attackStrength: Math.round(rating.attackStrength * 100),
+            defenseStrength: Math.round(rating.defenseStrength * 100),
+            recentForm: Math.round(rating.recentForm * 100),
+            expectedGoals: rating.expectedGoals.toFixed(2),
+            homeAdvantage: rating.homeAdvantage,
+            lastUpdated: rating.lastUpdated,
           }, null, 2),
         },
       ],
@@ -382,7 +274,7 @@ server.tool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("GoalConsensus MCP Server v2.1.0 running on stdio");
+  console.error("GoalConsensus MCP Server v3.0.0 running on stdio");
 }
 
 main().catch((err) => {

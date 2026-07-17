@@ -11,6 +11,7 @@ export interface MatchWithConsensus {
   matchDate: string;
   sport: "FOOTBALL";
   providerId: string;
+  competition?: string;
   consensus: ConsensusResult;
   llmPending: boolean;
 }

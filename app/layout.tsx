@@ -2,22 +2,25 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GoalConsensus — Multi-Agent Settlement Verification",
+  title: "GoalConsensus — Multi-Agent Football Intelligence Platform",
   description:
-    "Verify football match results using independent verification agents before prediction market settlement. Byzantine-inspired consensus across statistical, AI, and rule-based agents.",
+    "Predict and verify football match results across every competition using 3 independent AI agents. Byzantine-inspired consensus. Trustless verification. MCP integration.",
   keywords: [
     "football",
-    "settlement verification",
-    "prediction markets",
+    "prediction",
+    "verification",
     "consensus",
-    "AI verification",
+    "AI",
+    "prediction markets",
     "Injective",
     "x402",
+    "MCP",
+    "settlement",
   ],
   openGraph: {
-    title: "GoalConsensus — Multi-Agent Settlement Verification",
+    title: "GoalConsensus — Multi-Agent Football Intelligence Platform",
     description:
-      "Verify football match results using 3 independent AI agents before prediction market settlement. Byzantine-inspired consensus.",
+      "Predict and verify football match results using 3 independent AI agents. Byzantine-inspired consensus across all competitions.",
     url: "https://goalconsensus.onrender.com",
     siteName: "GoalConsensus",
     type: "website",
@@ -25,9 +28,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "GoalConsensus — Settlement Verification",
+    title: "GoalConsensus — Football Intelligence Platform",
     description:
-      "Verify football match results using independent AI agents before prediction market settlement.",
+      "Predict and verify football match results using independent AI agents. Byzantine consensus. MCP integration.",
   },
   robots: {
     index: true,
