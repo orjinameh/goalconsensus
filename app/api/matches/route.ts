@@ -34,7 +34,16 @@ export async function GET() {
       grouped.get(key)!.push(m);
     }
 
+    const fastAgents = agents.filter(
+      (a) => a.agentId !== "llm-reasoning"
+    );
+    const llmAgent = agents.find(
+      (a) => a.agentId === "llm-reasoning"
+    );
+
     const enriched: EnrichedMatch[] = [];
+    const llmPromises: Promise<void>[] = [];
+
     for (const [, group] of grouped) {
       const first = group[0];
       const responding = providerResults.filter(
@@ -56,15 +65,34 @@ export async function GET() {
         rawResults: group,
       };
 
-      const agentOutputs = await Promise.all(
-        agents.map((agent) => agent.verify(canonicalState))
+      const fastResults = await Promise.all(
+        fastAgents.map((agent) => agent.verify(canonicalState))
       );
 
-      const consensus = computeAgentConsensus(
-        agentOutputs,
-        canonicalState
-      );
-      enriched.push({ ...first, consensus });
+      const entry: EnrichedMatch = {
+        ...first,
+        consensus: computeAgentConsensus(
+          fastResults,
+          canonicalState
+        ),
+      };
+      enriched.push(entry);
+
+      if (llmAgent) {
+        llmPromises.push(
+          llmAgent.verify(canonicalState).then((llmResult) => {
+            const allResults = [...fastResults, llmResult];
+            entry.consensus = computeAgentConsensus(
+              allResults,
+              canonicalState
+            );
+          })
+        );
+      }
+    }
+
+    if (llmPromises.length > 0) {
+      await Promise.allSettled(llmPromises);
     }
 
     return NextResponse.json({

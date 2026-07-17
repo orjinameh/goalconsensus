@@ -19,6 +19,16 @@ function getModelName(): string {
   return process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 }
 
+const COOLDOWN_MS = 3000;
+let lastCallTime = 0;
+
+const llmCache = new Map<string, { result: AgentOutput; ts: number }>();
+const CACHE_TTL_MS = 60_000;
+
+function cacheKey(state: CanonicalMatchState): string {
+  return `${state.homeTeam}-${state.awayTeam}-${state.status}-${state.homeScore ?? "x"}-${state.awayScore ?? "x"}`;
+}
+
 interface LLMResponse {
   winner: string;
   homeScore: number;
@@ -32,9 +42,6 @@ function fallbackOutput(
   state: CanonicalMatchState,
   start: number
 ): AgentOutput {
-  const explanation =
-    "LLM temporarily unavailable. Consensus continued using the remaining verification agents.";
-
   return {
     agentId: "llm-reasoning",
     agentName: "LLM Reasoning Agent",
@@ -44,7 +51,8 @@ function fallbackOutput(
       awayScore: null,
     },
     confidence: 0,
-    explanation,
+    explanation:
+      "LLM temporarily unavailable. Consensus continued using the remaining verification agents.",
     evidence: [
       {
         source: "llm-reasoning",
@@ -88,80 +96,57 @@ export const llmReasoningAgent: VerificationAgent = {
       return fallbackOutput(state, start);
     }
 
+    const key = cacheKey(state);
+    const cached = llmCache.get(key);
+    if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      return { ...cached.result, latencyMs: Date.now() - start };
+    }
+
+    const elapsed = Date.now() - lastCallTime;
+    if (elapsed < COOLDOWN_MS) {
+      await new Promise((r) =>
+        setTimeout(r, COOLDOWN_MS - elapsed)
+      );
+    }
+
     try {
       const client = getClient();
       const model = getModelName();
-      const maxRetries = 3;
-      let lastError: unknown;
+      lastCallTime = Date.now();
 
-      let response;
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          response = await client.chat.completions.create({
-            model,
-            temperature: 0.2,
-            max_tokens: 512,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a professional football analyst specializing in match prediction. Analyze match context and predict outcomes. Respond only in valid JSON with no markdown formatting.",
-              },
-              {
-                role: "user",
-                content: `Analyze this football match: ${state.homeTeam} vs ${state.awayTeam}.
-Status: ${state.status}
-${state.homeScore !== null ? `Current score: ${state.homeTeam} ${state.homeScore} - ${state.awayScore} ${state.awayTeam}` : "Score not yet available."}
+      const response = await client.chat.completions.create({
+        model,
+        temperature: 0.2,
+        max_tokens: 256,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a football match analyst. Respond only in valid JSON, no markdown.",
+          },
+          {
+            role: "user",
+            content: `Predict: ${state.homeTeam} vs ${state.awayTeam} (${state.status}).
+${state.homeScore !== null ? `Score: ${state.homeTeam} ${state.homeScore}-${state.awayScore} ${state.awayTeam}.` : ""}
+Return: {"winner":"team","homeScore":0,"awayScore":0,"confidence":0,"reasoning":"...","keyFactors":["...","...","..."]}`,
+          },
+        ],
+      });
 
-Consider: recent form, venue advantage, head-to-head record, squad depth, tactical matchup, home advantage.
-Return JSON: { "winner": string, "homeScore": number, "awayScore": number, "confidence": number 0-100, "reasoning": string, "keyFactors": [3 strings] }`,
-              },
-            ],
-          });
-          break;
-        } catch (err: any) {
-          lastError = err;
-          const status = err?.status || err?.code;
-          if (status === 429 && attempt < maxRetries) {
-            const retryAfter = parseFloat(
-              err?.headers?.["retry-after"] || "0"
-            ) || Math.pow(2, attempt + 1);
-            console.warn(
-              `[llm-reasoning] Rate limited, retrying in ${retryAfter.toFixed(1)}s (attempt ${attempt + 1}/${maxRetries})`
-            );
-            await new Promise((r) => setTimeout(r, retryAfter * 1000));
-            continue;
-          }
-          throw err;
-        }
-      }
-
-      const content = response!.choices[0]?.message?.content || "{}";
-      const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
+      const content =
+        response.choices[0]?.message?.content || "{}";
+      const cleaned = content
+        .replace(/```json\n?|\n?```/g, "")
+        .trim();
       const parsed = JSON.parse(cleaned) as LLMResponse;
 
       const winner = parsed.winner || state.homeTeam;
-      const confidence = Math.min(100, Math.max(0, parsed.confidence || 50));
+      const confidence = Math.min(
+        100,
+        Math.max(0, parsed.confidence || 50)
+      );
 
-      const evidence: AgentEvidence[] = [
-        {
-          source: "llm-reasoning",
-          detail: `Predicted winner: ${winner}`,
-          weight: 0.4,
-        },
-        {
-          source: "llm-reasoning",
-          detail: `Confidence: ${confidence}%`,
-          weight: 0.3,
-        },
-        {
-          source: "llm-reasoning",
-          detail: `Score: ${parsed.homeScore}-${parsed.awayScore}`,
-          weight: 0.3,
-        },
-      ];
-
-      return {
+      const result: AgentOutput = {
         agentId: "llm-reasoning",
         agentName: "LLM Reasoning Agent",
         prediction: {
@@ -171,15 +156,34 @@ Return JSON: { "winner": string, "homeScore": number, "awayScore": number, "conf
         },
         confidence,
         explanation:
-          `LLM analysis: ${parsed.reasoning || "No detailed reasoning provided."} ` +
-          `Key factors: ${(parsed.keyFactors || []).join("; ")}.`,
-        evidence,
+          `LLM: ${parsed.reasoning || "No reasoning."} ` +
+          `Factors: ${(parsed.keyFactors || []).join("; ")}.`,
+        evidence: [
+          {
+            source: "llm-reasoning",
+            detail: `Winner: ${winner}`,
+            weight: 0.4,
+          },
+          {
+            source: "llm-reasoning",
+            detail: `Confidence: ${confidence}%`,
+            weight: 0.3,
+          },
+          {
+            source: "llm-reasoning",
+            detail: `Score: ${parsed.homeScore}-${parsed.awayScore}`,
+            weight: 0.3,
+          },
+        ],
         timestamp: new Date().toISOString(),
         latencyMs: Date.now() - start,
       };
+
+      llmCache.set(key, { result, ts: Date.now() });
+      return result;
     } catch (err) {
       console.error(
-        `[llm-reasoning] API error: ${err instanceof Error ? err.message : "unknown"}`
+        `[llm-reasoning] ${err instanceof Error ? err.message : "unknown"}`
       );
       return fallbackOutput(state, start);
     }
