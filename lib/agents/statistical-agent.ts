@@ -251,12 +251,10 @@ export const statisticalAgent: VerificationAgent = {
       },
       confidence,
       explanation:
-        `Poisson model predicts ${state.homeTeam} ${score.home}-${score.away} ${state.awayTeam}. ` +
-        `${state.homeTeam} xG: ${homeXG.toFixed(2)}, ${state.awayTeam} xG: ${awayXG.toFixed(2)}. ` +
-        `Win probability: Home ${(probs.home * 100).toFixed(1)}%, ` +
-        `Draw ${(probs.draw * 100).toFixed(1)}%, ` +
-        `Away ${(probs.away * 100).toFixed(1)}%. ` +
-        `Home advantage: +${HOME_ADVANTAGE_XG} xG.`,
+        `Based on team form and strength, predicts ${state.homeTeam} ${score.home}-${score.away} ${state.awayTeam}. ` +
+        `${state.homeTeam} win chance: ${(probs.home * 100).toFixed(0)}%, ` +
+        `Draw: ${(probs.draw * 100).toFixed(0)}%, ` +
+        `${state.awayTeam} win: ${(probs.away * 100).toFixed(0)}%.`,
       evidence,
       timestamp: new Date().toISOString(),
       latencyMs: Date.now() - start,

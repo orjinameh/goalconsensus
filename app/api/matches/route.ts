@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { fetchAllProviders, MatchResult } from "@/lib/providers";
 import { agents } from "@/lib/agents";
-import { CanonicalMatchState } from "@/lib/agents/types";
+import { CanonicalMatchState, AgentOutput } from "@/lib/agents/types";
 import { computeAgentConsensus, ConsensusResult } from "@/lib/consensus";
 
 export const dynamic = "force-dynamic";
 
 interface EnrichedMatch extends MatchResult {
   consensus: ConsensusResult;
+  llmPending: boolean;
 }
 
 function dedupeMatches(matches: MatchResult[]): MatchResult[] {
@@ -17,6 +18,13 @@ function dedupeMatches(matches: MatchResult[]): MatchResult[] {
     if (!seen.has(key)) seen.set(key, m);
   }
   return Array.from(seen.values());
+}
+
+const llmCache = new Map<string, AgentOutput[]>();
+const llmInFlight = new Set<string>();
+
+function matchKey(home: string, away: string) {
+  return `${home.toLowerCase()}|${away.toLowerCase()}`;
 }
 
 export async function GET() {
@@ -34,15 +42,10 @@ export async function GET() {
       grouped.get(key)!.push(m);
     }
 
-    const fastAgents = agents.filter(
-      (a) => a.id !== "llm-reasoning"
-    );
-    const llmAgent = agents.find(
-      (a) => a.id === "llm-reasoning"
-    );
+    const fastAgents = agents.filter((a) => a.id !== "llm-reasoning");
+    const llmAgent = agents.find((a) => a.id === "llm-reasoning");
 
     const enriched: EnrichedMatch[] = [];
-    const llmPromises: Promise<void>[] = [];
 
     for (const [, group] of grouped) {
       const first = group[0];
@@ -69,30 +72,31 @@ export async function GET() {
         fastAgents.map((agent) => agent.verify(canonicalState))
       );
 
-      const entry: EnrichedMatch = {
+      const key = matchKey(first.homeTeam, first.awayTeam);
+      const cachedLLM = llmCache.get(key) || [];
+      const allResults = [...fastResults, ...cachedLLM];
+      const pending = llmInFlight.has(key);
+
+      enriched.push({
         ...first,
-        consensus: computeAgentConsensus(
-          fastResults,
-          canonicalState
-        ),
-      };
-      enriched.push(entry);
+        consensus: computeAgentConsensus(allResults, canonicalState),
+        llmPending: pending,
+      });
 
-      if (llmAgent) {
-        llmPromises.push(
-          llmAgent.verify(canonicalState).then((llmResult) => {
-            const allResults = [...fastResults, llmResult];
-            entry.consensus = computeAgentConsensus(
-              allResults,
-              canonicalState
-            );
+      if (llmAgent && !llmInFlight.has(key) && !llmCache.has(key)) {
+        llmInFlight.add(key);
+        llmAgent
+          .verify(canonicalState)
+          .then((llmResult) => {
+            llmCache.set(key, [llmResult]);
           })
-        );
+          .catch(() => {
+            llmCache.set(key, []);
+          })
+          .finally(() => {
+            llmInFlight.delete(key);
+          });
       }
-    }
-
-    if (llmPromises.length > 0) {
-      await Promise.allSettled(llmPromises);
     }
 
     return NextResponse.json({

@@ -3,218 +3,313 @@
 import { useState } from "react";
 import { MatchResult } from "@/lib/providers";
 import { ConsensusResult } from "@/lib/consensus";
-import { ConsensusIndicator } from "./ConsensusIndicator";
 import {
   ChevronDown,
   ChevronUp,
-  CheckCircle,
+  CheckCircle2,
   XCircle,
   Clock,
   AlertTriangle,
+  Loader2,
+  Shield,
+  Zap,
 } from "lucide-react";
 
 interface Props {
-  match: MatchResult & { consensus: ConsensusResult };
+  match: MatchResult & { consensus: ConsensusResult; llmPending?: boolean };
 }
 
-const verdictColors: Record<string, string> = {
-  SETTLE: "bg-green-500/20 text-green-400 border-green-500/30",
-  DO_NOT_SETTLE: "bg-red-500/20 text-red-400 border-red-500/30",
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  INSUFFICIENT_DATA: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  UNSUPPORTED_SPORT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+const verdictConfig: Record<
+  string,
+  { label: string; color: string; bg: string; icon: typeof CheckCircle2; description: string }
+> = {
+  SETTLE: {
+    label: "Verified",
+    color: "text-green-400",
+    bg: "bg-green-500/10 border-green-500/20",
+    icon: CheckCircle2,
+    description: "All checks passed. Result is safe to settle.",
+  },
+  DO_NOT_SETTLE: {
+    label: "Disputed",
+    color: "text-red-400",
+    bg: "bg-red-500/10 border-red-500/20",
+    icon: XCircle,
+    description: "Analysts disagree. Do not settle yet.",
+  },
+  PENDING: {
+    label: "In Progress",
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/10 border-yellow-500/20",
+    icon: Clock,
+    description: "Match hasn't finished yet. Check back later.",
+  },
+  INSUFFICIENT_DATA: {
+    label: "Needs Data",
+    color: "text-gray-400",
+    bg: "bg-gray-500/10 border-gray-500/20",
+    icon: AlertTriangle,
+    description: "Not enough data sources to verify this match.",
+  },
+  UNSUPPORTED_SPORT: {
+    label: "Not Supported",
+    color: "text-gray-400",
+    bg: "bg-gray-500/10 border-gray-500/20",
+    icon: AlertTriangle,
+    description: "This sport is not supported yet.",
+  },
 };
 
-const verdictIcons: Record<string, typeof CheckCircle> = {
-  SETTLE: CheckCircle,
-  DO_NOT_SETTLE: XCircle,
-  PENDING: Clock,
-  INSUFFICIENT_DATA: AlertTriangle,
-  UNSUPPORTED_SPORT: AlertTriangle,
-};
+function ConfidenceBar({ value }: { value: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            value >= 70
+              ? "bg-green-500"
+              : value >= 40
+                ? "bg-yellow-500"
+                : "bg-red-500"
+          }`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+      <span className="text-xs text-gray-400 tabular-nums w-8 text-right">
+        {value}%
+      </span>
+    </div>
+  );
+}
 
 export function MatchCard({ match }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [showEvidence, setShowEvidence] = useState(false);
 
   const v = match.consensus;
-  const VerdictIcon = verdictIcons[v.settlementDecision] || Clock;
+  const verdict = verdictConfig[v.settlementDecision] || verdictConfig.PENDING;
+  const VerdictIcon = verdict.icon;
 
   const predictionLabel =
     v.finalPrediction.winner === "Draw"
       ? "Draw"
       : v.finalPrediction.winner;
 
+  const finished = match.status === "FINISHED";
+  const live = match.status === "LIVE";
+  const hasScore =
+    match.homeScore !== null && match.awayScore !== null;
+
   return (
-    <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span
-          className={`text-xs font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${verdictColors[v.settlementDecision] || verdictColors.PENDING}`}
-        >
-          <VerdictIcon size={10} />
-          {v.settlementDecision}
-        </span>
-        {match.status === "LIVE" && (
-          <span className="text-xs text-red-400 flex items-center gap-1">
-            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            LIVE
+    <div className="bg-[#111] border border-white/10 rounded-xl overflow-hidden">
+      {/* Score Header */}
+      <div className="px-5 pt-4 pb-3">
+        <div className="flex items-center justify-between mb-4">
+          <span
+            className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${verdict.bg} ${verdict.color}`}
+          >
+            <VerdictIcon size={12} />
+            {verdict.label}
+            {match.llmPending && (
+              <Loader2 size={10} className="animate-spin ml-0.5" />
+            )}
           </span>
-        )}
-        {match.status === "FINISHED" && (
-          <span className="text-xs text-gray-500">FT</span>
-        )}
-        {match.status === "SCHEDULED" && (
-          <span className="text-xs text-gray-500">
-            {new Date(match.matchDate).toLocaleDateString()}
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex-1 text-right">
-          <span className="text-white font-medium">
-            {match.homeTeam}
-          </span>
-        </div>
-        <div className="mx-4 font-mono text-xl text-white min-w-[80px] text-center">
-          {match.homeScore !== null && match.awayScore !== null
-            ? `${match.homeScore} - ${match.awayScore}`
-            : "vs"}
-        </div>
-        <div className="flex-1 text-left">
-          <span className="text-white font-medium">
-            {match.awayTeam}
-          </span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div className="bg-white/5 rounded p-2">
-          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
-            Prediction
+          <div className="flex items-center gap-2">
+            {live && (
+              <span className="flex items-center gap-1.5 text-xs text-red-400">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                LIVE
+              </span>
+            )}
+            {finished && (
+              <span className="text-xs text-gray-500">Full Time</span>
+            )}
+            {!finished && !live && (
+              <span className="text-xs text-gray-500">
+                {new Date(match.matchDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+            )}
           </div>
-          <div className="text-sm text-white font-medium truncate">
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex-1 text-right pr-4">
+            <div className="text-white font-semibold text-sm leading-tight">
+              {match.homeTeam}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="font-mono text-2xl font-bold text-white tabular-nums">
+              {hasScore ? match.homeScore : "-"}
+            </span>
+            <span className="text-gray-600 text-lg">:</span>
+            <span className="font-mono text-2xl font-bold text-white tabular-nums">
+              {hasScore ? match.awayScore : "-"}
+            </span>
+          </div>
+          <div className="flex-1 text-left pl-4">
+            <div className="text-white font-semibold text-sm leading-tight">
+              {match.awayTeam}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="px-5 pb-4 grid grid-cols-3 gap-3">
+        <div className="bg-white/[0.03] rounded-lg p-2.5 text-center">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
+            Predicted
+          </div>
+          <div className="text-xs text-white font-medium truncate">
             {predictionLabel}
           </div>
         </div>
-        <div className="bg-white/5 rounded p-2">
-          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
+        <div className="bg-white/[0.03] rounded-lg p-2.5 text-center">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
             Confidence
           </div>
-          <div className="text-sm text-white font-medium">
+          <div className="text-xs text-white font-medium">
             {v.confidence}%
           </div>
-          <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden mt-1">
-            <div
-              className={`h-full rounded-full transition-all ${
-                v.confidence >= 66
-                  ? "bg-green-500"
-                  : v.confidence >= 33
-                    ? "bg-yellow-500"
-                    : "bg-gray-500"
-              }`}
-              style={{ width: `${v.confidence}%` }}
-            />
-          </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div className="bg-white/5 rounded p-2">
-          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
+        <div className="bg-white/[0.03] rounded-lg p-2.5 text-center">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
             Agreement
           </div>
-          <div className="text-sm text-white font-medium">
-            {v.agreement} / {v.totalAgents}
-          </div>
-        </div>
-        <div className="bg-white/5 rounded p-2">
-          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
-            Overall Confidence
-          </div>
-          <div className="text-sm text-white font-medium">
-            {v.confidence}%
+          <div className="text-xs text-white font-medium">
+            {v.agreement}/{v.totalAgents}
           </div>
         </div>
       </div>
 
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-300 transition-colors mb-2"
-      >
-        <span>Agent Consensus</span>
-        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-      </button>
+      {/* Confidence Bar */}
+      <div className="px-5 pb-4">
+        <ConfidenceBar value={v.confidence} />
+      </div>
 
-      {expanded && (
-        <div className="mb-3 space-y-3">
-          <ConsensusIndicator consensus={v} />
+      {/* Verdict Description */}
+      <div className={`mx-5 mb-4 px-3 py-2 rounded-lg text-xs ${verdict.bg} ${verdict.color}`}>
+        {verdict.description}
+      </div>
 
-          <div className="space-y-2">
-            {v.agents.map((agent) => (
-              <div
-                key={agent.agentId}
-                className="p-2 bg-white/5 rounded border border-white/5"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-white font-medium">
-                    {agent.agentName}
-                  </span>
-                  <span className="text-[10px] text-gray-500 font-mono">
-                    {agent.latencyMs}ms
-                  </span>
-                </div>
-                <p className="text-[11px] text-gray-400">
-                  {agent.explanation}
-                </p>
+      {/* How It Works */}
+      <div className="border-t border-white/5">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center justify-between px-5 py-3 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Shield size={12} />
+            How was this verified?
+          </span>
+          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+
+        {expanded && (
+          <div className="px-5 pb-4 space-y-3">
+            {/* Agent Votes */}
+            <div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">
+                Verification Agents
               </div>
-            ))}
-          </div>
+              <div className="space-y-1.5">
+                {v.agents.map((agent) => {
+                  const agrees =
+                    agent.prediction.winner === v.finalPrediction.winner;
+                  const isLLM = agent.agentId === "llm-reasoning";
+                  const isUnavailable =
+                    agent.confidence === 0 && isLLM;
+                  const isPending = match.llmPending && isLLM && isUnavailable;
+                  const agentLabel =
+                    agent.agentId === "statistical"
+                      ? "Stats Model"
+                      : isLLM
+                        ? "AI Reasoning"
+                        : "Rule Check";
 
-          <div className="text-[10px] text-gray-500 font-mono px-2 py-1 bg-white/5 rounded">
-            {v.reasoning}
-          </div>
-        </div>
-      )}
-
-      <button
-        onClick={() => setShowEvidence(!showEvidence)}
-        className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-gray-300 transition-colors mb-2"
-      >
-        <span>Evidence ({v.evidence.length} items)</span>
-        {showEvidence ? (
-          <ChevronUp size={14} />
-        ) : (
-          <ChevronDown size={14} />
-        )}
-      </button>
-
-      {showEvidence && (
-        <div className="mb-3 space-y-1">
-          {v.evidence.map((e, i) => (
-            <div
-              key={i}
-              className="flex items-start gap-2 text-[10px]"
-            >
-              <span
-                className={`shrink-0 px-1 rounded ${
-                  e.source === "statistical"
-                    ? "bg-blue-500/20 text-blue-400"
-                    : e.source === "llm-reasoning"
-                      ? "bg-purple-500/20 text-purple-400"
-                      : "bg-orange-500/20 text-orange-400"
-                }`}
-              >
-                {e.source.split("-")[0]}
-              </span>
-              <span className="text-gray-400">{e.detail}</span>
-              <span className="text-gray-600 shrink-0">
-                w:{(e.weight * 100).toFixed(0)}%
-              </span>
+                  return (
+                    <div
+                      key={agent.agentId}
+                      className="flex items-center gap-3 p-2 bg-white/[0.02] rounded-lg"
+                    >
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                          isPending
+                            ? "bg-purple-500/20"
+                            : isUnavailable
+                              ? "bg-gray-700 text-gray-500"
+                              : agrees
+                                ? "bg-green-500/20 text-green-400"
+                                : "bg-red-500/20 text-red-400"
+                        }`}
+                      >
+                        {isPending ? (
+                          <Loader2 size={12} className="text-purple-400 animate-spin" />
+                        ) : isUnavailable ? (
+                          <span className="text-[10px]">-</span>
+                        ) : agrees ? (
+                          <CheckCircle2 size={12} />
+                        ) : (
+                          <XCircle size={12} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-white font-medium">
+                          {agentLabel}
+                        </div>
+                        <div className="text-[10px] text-gray-500 truncate">
+                          {isPending
+                            ? "Analyzing..."
+                            : isUnavailable
+                              ? "Unavailable"
+                              : `Predicted: ${agent.prediction.winner} (${agent.confidence}%)`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            {/* Simple Reasoning */}
+            <div className="text-[11px] text-gray-400 bg-white/[0.02] rounded-lg p-3 leading-relaxed">
+              {v.agreement === v.totalAgents && v.agreement > 0 && (
+                <span className="flex items-start gap-2">
+                  <CheckCircle2 size={12} className="text-green-400 mt-0.5 shrink-0" />
+                  All {v.agreement} analysts agree on the result.
+                </span>
+              )}
+              {v.agreement < v.totalAgents && v.agreement > 0 && (
+                <span className="flex items-start gap-2">
+                  <AlertTriangle size={12} className="text-yellow-400 mt-0.5 shrink-0" />
+                  {v.agreement} of {v.totalAgents} analysts agree.
+                  {v.minorityOpinion && (
+                    <span className="text-gray-500">
+                      {" "}One analyst sees it differently.
+                    </span>
+                  )}
+                </span>
+              )}
+              {v.agreement === 0 && (
+                <span className="flex items-start gap-2">
+                  <XCircle size={12} className="text-red-400 mt-0.5 shrink-0" />
+                  No analysts agree on the outcome.
+                </span>
+              )}
+            </div>
+
+            {/* Data Sources */}
+            <div className="text-[10px] text-gray-600 flex items-center gap-2">
+              <Zap size={10} />
+              Verified from {v.canonicalState.providerCount} data source
+              {v.canonicalState.providerCount !== 1 ? "s" : ""}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

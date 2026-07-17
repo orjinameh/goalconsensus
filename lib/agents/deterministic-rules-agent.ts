@@ -139,8 +139,8 @@ export const deterministicRulesAgent: VerificationAgent = {
     const failedRules = rules.filter((r) => !r.passed);
     const explanation =
       failedRules.length === 0
-        ? `All ${rules.length} validation rules passed. Match state is verified.`
-        : `${passedRules.length}/${rules.length} rules passed. Failed: ${failedRules.map((r) => r.name).join(", ")}.`;
+        ? `All data checks passed. Match result is verified.`
+        : `${passedRules.length}/${rules.length} checks passed. Issues: ${failedRules.map((r) => r.name.replace(/_/g, " ")).join(", ")}.`;
 
     return {
       agentId: "deterministic-rules",

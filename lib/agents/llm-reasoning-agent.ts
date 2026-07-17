@@ -156,8 +156,8 @@ Return: {"winner":"team","homeScore":0,"awayScore":0,"confidence":0,"reasoning":
         },
         confidence,
         explanation:
-          `LLM: ${parsed.reasoning || "No reasoning."} ` +
-          `Factors: ${(parsed.keyFactors || []).join("; ")}.`,
+          `${parsed.reasoning || "AI analysis based on form and context."} ` +
+          `Key factors: ${(parsed.keyFactors || []).join("; ")}.`,
         evidence: [
           {
             source: "llm-reasoning",

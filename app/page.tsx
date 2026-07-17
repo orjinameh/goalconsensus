@@ -4,16 +4,17 @@ import { useState, useEffect } from "react";
 import { LiveDashboard } from "@/components/LiveDashboard";
 import {
   Shield,
-  Cpu,
+  CheckCircle2,
   CreditCard,
   ExternalLink,
-  Brain,
-  BarChart3,
-  Scale,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export default function Home() {
   const [paymentCount, setPaymentCount] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("x402-payment-count");
@@ -28,144 +29,130 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-white/10 px-6 py-5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <header className="border-b border-white/10 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Shield size={24} className="text-green-500" />
+            <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+              <Shield size={18} className="text-green-400" />
+            </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">
+              <h1 className="text-lg font-bold tracking-tight">
                 GoalConsensus
               </h1>
-              <p className="text-xs text-gray-500">
-                Football Settlement Verification
+              <p className="text-[11px] text-gray-500">
+                World Cup 2026 Settlement Verification
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            Auto-refresh 30s
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+              <CreditCard size={11} />
+              <span>{paymentCount} queries</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              Live
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 flex max-w-7xl mx-auto w-full px-6 py-6 gap-6">
-        <main className="flex-1">
-          <p className="text-sm text-gray-400 mb-6">
-            Football-only multi-agent settlement verification. Two
-            independent data providers establish canonical match
-            state, verified by three analysis agents with
-            Byzantine-inspired consensus. No simulated data.
+      <div className="flex-1 max-w-6xl mx-auto w-full px-6 py-6">
+        {/* Hero */}
+        <div className="mb-6">
+          <p className="text-sm text-gray-300 leading-relaxed max-w-2xl">
+            Every World Cup match result is verified by{" "}
+            <span className="text-white font-medium">
+              two independent data sources
+            </span>{" "}
+            and{" "}
+            <span className="text-white font-medium">
+              three analysis agents
+            </span>{" "}
+            before being approved for settlement. No single source can
+            fake a result.
           </p>
-          <LiveDashboard />
-        </main>
+        </div>
 
-        <aside className="w-72 shrink-0">
-          <div className="bg-[#111] border border-white/10 rounded-lg p-4 space-y-4">
-            <h2 className="text-sm font-medium text-white">
-              System Architecture
-            </h2>
+        <LiveDashboard />
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <Cpu size={14} className="text-green-500" />
-                <div>
-                  <div className="text-xs text-gray-400">
-                    MCP Server
-                  </div>
-                  <div className="text-xs text-white font-mono">
-                    goalconsensus-mcp v2.0.0
-                  </div>
-                </div>
-              </div>
+        {/* How It Works */}
+        <div className="mt-8 border-t border-white/5 pt-6">
+          <button
+            onClick={() => setShowHelp(!showHelp)}
+            className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            <HelpCircle size={12} />
+            How does settlement verification work?
+            {showHelp ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
 
-              <div className="flex items-center gap-3">
-                <CreditCard size={14} className="text-green-500" />
-                <div>
-                  <div className="text-xs text-gray-400">
-                    x402 Payments (this session)
+          {showHelp && (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-[#111] border border-white/5 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-blue-500/20 rounded flex items-center justify-center">
+                    <span className="text-[10px] text-blue-400 font-bold">1</span>
                   </div>
-                  <div className="text-xs text-white font-mono">
-                    {paymentCount} queries x 0.001 USDC
-                  </div>
+                  <span className="text-xs text-white font-medium">
+                    Two Data Sources
+                  </span>
                 </div>
-              </div>
-
-              <div className="border-t border-white/5 pt-3">
-                <div className="text-xs text-gray-400 mb-2">
-                  Data Providers
-                </div>
-                <div className="text-xs text-gray-500 space-y-0.5">
-                  <div>1. football-data.org</div>
-                  <div>2. thesportsdb.com</div>
-                </div>
-                <p className="text-[10px] text-gray-600 mt-1">
-                  Establish canonical match state. 2+ providers
-                  required.
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  We pull match data from football-data.org and
+                  thesportsdb.com independently. Both must agree
+                  on the score before we proceed.
                 </p>
               </div>
 
-              <div className="border-t border-white/5 pt-3">
-                <div className="text-xs text-gray-400 mb-2">
-                  Verification Agents
+              <div className="bg-[#111] border border-white/5 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-purple-500/20 rounded flex items-center justify-center">
+                    <span className="text-[10px] text-purple-400 font-bold">2</span>
+                  </div>
+                  <span className="text-xs text-white font-medium">
+                    Three Analysts
+                  </span>
                 </div>
-                <div className="text-xs text-gray-500 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <BarChart3
-                      size={10}
-                      className="text-blue-400"
-                    />
-                    <span>
-                      Statistical (Poisson + xG)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Brain
-                      size={10}
-                      className="text-purple-400"
-                    />
-                    <span>LLM Reasoning (Groq)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Scale
-                      size={10}
-                      className="text-orange-400"
-                    />
-                    <span>Deterministic Rules</span>
-                  </div>
-                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  A stats model, an AI reasoner, and a rule checker
+                  each independently verify the result. They
+                  don&apos;t talk to each other.
+                </p>
               </div>
 
-              <div className="border-t border-white/5 pt-3">
-                <div className="text-xs text-gray-400 mb-2">
-                  BFT Consensus
+              <div className="bg-[#111] border border-white/5 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-green-500/20 rounded flex items-center justify-center">
+                    <CheckCircle2 size={12} className="text-green-400" />
+                  </div>
+                  <span className="text-xs text-white font-medium">
+                    Safe Settlement
+                  </span>
                 </div>
-                <div className="text-xs font-mono text-gray-500 space-y-0.5">
-                  <div>
-                    n = 3 (verification agents)
-                  </div>
-                  <div>
-                    threshold = ceil(2n/3) = 2
-                  </div>
-                  <div>
-                    majority vote determines settlement
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-white/5 pt-3">
-                <a
-                  href="https://zenodo.org/records/20577665"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
-                >
-                  <ExternalLink size={10} />
-                  Research paper
-                </a>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  If at least 2 of 3 analysts agree, the result
+                  is approved for on-chain settlement via
+                  Injective&apos;s x402 micropayments.
+                </p>
               </div>
             </div>
+          )}
+
+          <div className="mt-4 flex items-center gap-4 text-[10px] text-gray-600">
+            <a
+              href="https://zenodo.org/records/20577665"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-gray-400 transition-colors flex items-center gap-1"
+            >
+              <ExternalLink size={9} />
+              Research paper
+            </a>
+            <span>MCP Server v2.0</span>
+            <span>Injective Testnet</span>
           </div>
-        </aside>
+        </div>
       </div>
     </div>
   );
