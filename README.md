@@ -1,117 +1,80 @@
-# GoalConsensus — The World Cup Intelligence Terminal
+# GoalConsensus — The AI Intelligence Marketplace for the 2026 World Cup
 
-**Five AI agents. Live debate. Premium reports. Predictions markets. Built on Injective.**
+> **Five AI agents independently analyze every match, debate their positions, and produce a single transparent verdict you can verify.**
 
-A full-stack multi-agent AI intelligence platform that analyzes every match in the 2026 FIFA World Cup using five specialist agents, live AI debate, premium deep-dive reports, and a prediction market with cross-chain USDC settlement.
+Football intelligence is broken. Single-source predictions with no debate, no accountability, and no transparency. GoalConsensus fixes this with a marketplace of specialist AI agents that disagree, challenge each other, and reach consensus — all visible to you.
+
+Built for the **Injective Global Cup**.
 
 ---
 
-## What It Does
+## The Problem
 
-### Five Specialist Agents
+- **Single-source bias** — Most prediction sites use one model. When it's wrong, there's no fallback.
+- **No debate** — No system shows you *why* agents agree or disagree. You get a number, not reasoning.
+- **No accountability** — Black-box predictions with no evidence trail. You can't verify anything.
+- **No developer access** — Closed APIs, rate limits, and subscriptions lock out builders.
 
-Each agent is an autonomous domain expert:
+## The Solution
+
+GoalConsensus is an intelligence marketplace where five specialist AI agents work independently, debate openly, and produce consensus transparently.
+
+```
+  ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
+  │  Football    │───▶│  Canonical   │───▶│  5 Specialist   │
+  │  Data APIs   │    │  State       │    │  AI Agents      │
+  └─────────────┘    └──────────────┘    └────────┬────────┘
+                                                  │
+                      ┌───────────────────────────┘
+                      ▼
+              ┌──────────────┐    ┌──────────────────────┐
+              │  AI Debate   │───▶│  Consensus Output    │
+              │  Engine      │    │  + Premium Reports   │
+              └──────────────┘    │  + Prediction Market │
+                                  └──────────────────────┘
+```
+
+---
+
+## The Agents
+
+Each agent is an independent domain expert. They analyze the same match from different angles, then debate to reach consensus.
 
 | Agent | Domain | Approach |
 |---|---|---|
-| **Tactical Analyst** | Formation analysis, pressing triggers, set-piece vulnerability | ELO-weighted team ratings, home advantage factor (+0.35 xG), historical matchup data |
-| **Statistical Agent** | Goal prediction, win probabilities, expected goals | Poisson regression, Monte Carlo simulation (10,000 iterations), entropy-based confidence |
-| **Market Analyst** | Odds analysis, value detection, line movement | Poisson-derived odds vs bookmaker odds, value identification, market consensus |
-| **Injury Analyst** | Squad fitness, recovery timelines, depth assessment | Injury database matching, ELO-adjusted squad strength, position coverage analysis |
-| **News Analyst** | Form analysis, context, motivation, travel factors | Recent form calculation (last 5 matches), home/away performance, rest days |
+| **Tactical Analyst** | Formations, pressing, set pieces | ELO-weighted ratings, home advantage, historical matchups |
+| **Statistical Agent** | Goal prediction, win probabilities | Poisson regression, Monte Carlo (10k iterations), entropy-based confidence |
+| **Market Analyst** | Odds analysis, value detection | Poisson-derived odds vs bookmaker odds, market consensus |
+| **Injury Analyst** | Squad fitness, suspensions | Injury database, ELO-adjusted squad strength, position coverage |
+| **News Analyst** | Form, motivation, context | Recent form (last 5 matches), home/away splits, rest days |
 
-### Live AI Debate
+### Live Debate
 
-After all five agents produce their individual analyses, a structured debate runs:
+After all five agents produce their analyses, a structured debate runs:
 
-1. **Round 1** — Each agent presents their stance (agree/disagree/neutral) with the tactical analyst's prediction
+1. **Round 1** — Each agent presents their stance (supports/challenges/nuanced) with the tactical analyst's prediction
 2. **Round 2** — Agents respond to each other's arguments
-3. **Consensus** — The system derives a winner, confidence score, agreement level, and minority opinion
+3. **Consensus** — A weighted verdict emerges with confidence score, agreement level, and minority opinion
 
-Every message in the debate is visible to the user with agent name, stance badge, and reasoning.
-
-### Premium Reports
-
-Deep-dive intelligence reports gated behind x402 micropayments:
-
-| Report | Price | Content |
-|---|---|---|
-| Full Tactical Breakdown | 0.005 USDC | 3,000+ word formation analysis, pressing triggers, key battles |
-| Historical Deep Dive | 0.003 USDC | Head-to-head records, venue-specific trends, rivalry context |
-| Player Impact Report | 0.002 USDC | Key player profiles, form analysis, tactical roles, impact scores |
-| Market Intelligence | 0.004 USDC | Odds comparison, value opportunities, market sentiment, line movement |
-| Risk Assessment | 0.01 USDC | Injury risks, fatigue factors, discipline concerns, squad depth |
-
-### Prediction Markets
-
-Stake on match outcomes with cross-chain USDC settlement:
-
-- View dynamic odds based on AI agent consensus
-- Place stakes (win/draw/loss) with confidence-weighted payouts
-- Markets resolve automatically when verified results are confirmed
-- CCTP bridge supports cross-chain USDC transfers (Ethereum, Arbitrum, Base)
+Every message in the debate is visible — agent name, stance, reasoning, and confidence.
 
 ---
 
-## Architecture
+## Injective Technology
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     The Intelligence Terminal                │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐                │
-│   │ Tactical  │  │Statistical│  │ Market   │  ... (5)      │
-│   │ Analyst   │  │  Agent   │  │ Analyst  │                │
-│   └─────┬─────┘  └─────┬────┘  └─────┬────┘               │
-│         │              │              │                     │
-│         ▼              ▼              ▼                     │
-│   ┌─────────────────────────────────────────────┐           │
-│   │            AI Debate Engine                  │           │
-│   │  (Round 1 → Round 2 → Consensus)            │           │
-│   └──────────────────┬──────────────────────────┘           │
-│                      │                                       │
-│          ┌───────────┼────────────┐                          │
-│          ▼           ▼            ▼                          │
-│   ┌────────────┐ ┌─────────┐ ┌──────────┐                  │
-│   │ Prediction  │ │Premium  │ │Prediction│                  │
-│   │  Engine     │ │Reports  │ │ Markets  │                  │
-│   │(Ensemble)   │ │(x402)   │ │(CCTP)    │                  │
-│   └──────┬─────┘ └────┬────┘ └────┬─────┘                  │
-│          │            │            │                         │
-│          ▼            ▼            ▼                         │
-│   ┌─────────────────────────────────────────────┐           │
-│   │              MCP Server (15 tools)           │           │
-│   │         x402 micropayment receipts           │           │
-│   └─────────────────────────────────────────────┘           │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Data Pipeline
-
-1. **Canonical State** — Two football-only providers (football-data.org, thesportsdb.com) establish the source of truth
-2. **Specialist Analysis** — Five agents independently analyze the match using team ratings, Poisson models, injury data, and news context
-3. **AI Debate** — Agents debate and form consensus with visible agreement/disagreement
-4. **Intelligence Delivery** — Results served via MCP Server, REST API, or UI
-
----
-
-## Injective Technology Integration
-
-| Technology | Implementation | Purpose |
+| Technology | What it does | Why it matters |
 |---|---|---|
-| **MCP Server** | `@modelcontextprotocol/sdk` with StdioServerTransport | Agent tool protocol — 15 tools for match intelligence |
-| **x402** | Payment receipts per API/MCP call (0.001 USDC) | Micropayments for premium reports and market access |
-| **CCTP** | Cross-chain USDC transfers via Axelar | Prediction market settlement across EVM chains |
-| **Agent Skills** | Structured MCP tool definitions with reasoning | Full agent reasoning, evidence, and provider health in every response |
+| **MCP Server** | 15 tools via Model Context Protocol | Any AI agent can access GoalConsensus intelligence |
+| **x402 Payments** | HTTP 402 micropayments in USDC | Premium reports gated at $0.002–$0.01 per query |
+| **CCTP Bridge** | Cross-chain USDC via Axelar | Prediction market settlement across EVM chains |
+| **Agent Skills** | Structured tool definitions with reasoning | Full evidence chain in every response |
 
 ### MCP Tools (15)
 
 | Tool | Category | Description |
 |---|---|---|
-| `analyze_match` | Intelligence | Full specialist analysis with all 5 agents |
-| `compare_teams` | Intelligence | Head-to-head comparison with specialist breakdown |
+| `analyze_match` | Intelligence | Full 5-agent specialist analysis |
+| `compare_teams` | Intelligence | Head-to-head with specialist breakdown |
 | `historical_analysis` | Intelligence | Historical matchup and venue data |
 | `predict_match` | Prediction | AI ensemble prediction with upset probability |
 | `market_analysis` | Specialist | Odds analysis and value detection |
@@ -122,9 +85,23 @@ Stake on match outcomes with cross-chain USDC settlement:
 | `verify_settlement` | Verification | Settlement safety check |
 | `get_provider_consensus` | Verification | Cross-provider score comparison |
 | `consensus` | Legacy | BFT agent consensus for live matches |
-| `get_live_matches` | General | All matches with mode-aware status |
+| `get_live_matches` | General | All matches with intelligence status |
 | `get_report_catalog` | Premium | Available report types and pricing |
-| `get_qualification_scenarios` | Intelligence | World Cup group stage scenarios |
+| `qualification_scenarios` | Intelligence | World Cup group stage scenarios |
+
+---
+
+## Premium Reports
+
+Deep-dive intelligence reports gated behind x402 micropayments:
+
+| Report | Price | Content |
+|---|---|---|
+| Full Tactical Breakdown | 0.005 USDC | 3,000+ word formation analysis, pressing triggers, key battles |
+| Historical Deep Dive | 0.003 USDC | Head-to-head records, venue trends, rivalry context |
+| Player Impact Report | 0.002 USDC | Key player profiles, form, tactical roles, impact scores |
+| Market Intelligence | 0.004 USDC | Odds comparison, value opportunities, line movement |
+| Risk Assessment | 0.01 USDC | Injury risks, fatigue, discipline, squad depth |
 
 ---
 
@@ -132,19 +109,19 @@ Stake on match outcomes with cross-chain USDC settlement:
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/matches` | GET | Football matches with predictions/verification |
-| `/api/consensus` | POST | Full BFT consensus (`{ homeTeam, awayTeam }`) |
-| `/api/predict` | POST | Ensemble prediction (`{ homeTeam, awayTeam }`) |
-| `/api/intelligence` | POST | Full specialist analysis (`{ homeTeam, awayTeam }`) |
+| `/api/matches` | GET | Football matches with intelligence status |
+| `/api/intelligence` | POST | Full 5-agent specialist analysis |
+| `/api/consensus` | POST | BFT agent consensus (legacy) |
+| `/api/predict` | POST | Ensemble prediction (scheduled) |
 | `/api/reports/catalog` | GET | Premium report types and pricing |
-| `/api/reports/generate` | POST | Generate premium report |
-| `/api/market` | GET | Prediction market odds for all matches |
-| `/api/market/stake` | POST | Place a stake on match outcome |
-| `/api/market/resolve` | POST | Resolve a prediction market |
+| `/api/reports/generate` | POST | Generate premium report (x402) |
+| `/api/market` | GET | Prediction market odds |
+| `/api/market/stake` | POST | Place a stake (CCTP) |
+| `/api/market/resolve` | POST | Resolve a market |
 
 ---
 
-## Setup
+## Quick Start
 
 ```bash
 git clone https://github.com/orjinameh/goalconsensus.git
@@ -160,8 +137,6 @@ cp .env.example .env
 #   OPENROUTER_API_KEY — Third fallback
 ```
 
-## Running
-
 ```bash
 npm run dev      # Next.js app — http://localhost:3000
 npm run mcp      # MCP Server (stdio)
@@ -169,7 +144,7 @@ npm test         # 24 unit tests
 npm run build    # Production build
 ```
 
-## Claude Desktop Integration
+### Claude Desktop Integration
 
 ```json
 {
@@ -197,22 +172,7 @@ npm run build    # Production build
 - **@modelcontextprotocol/sdk** — MCP Server with 15 tools
 - **Gemini / Groq / OpenRouter** — Multi-provider LLM chain with circuit breaker
 - **Axios** — Parallel provider calls with retry and timeout
-- **lucide-react** — Icons
 - **Node.js test runner** — 24 unit tests
-
----
-
-## Test Coverage
-
-24 tests covering:
-- Football match consensus (SETTLE, DO_NOT_SETTLE, PENDING)
-- Unsupported sports rejection
-- Provider timeout and insufficient data
-- Provider disagreement handling
-- LLM unavailability and zero-confidence agents
-- Evidence aggregation across agents
-- Confidence calculation and minority opinion
-- Canonical state propagation
 
 ---
 
@@ -221,17 +181,17 @@ npm run build    # Production build
 ```
 goalconsensus/
 ├── app/
-│   ├── page.tsx                      # World Cup Intelligence Terminal homepage
+│   ├── page.tsx                      # Homepage — agent marketplace + live intelligence
 │   ├── layout.tsx                    # Root layout with metadata
 │   ├── globals.css                   # Design system + animations
 │   └── api/
-│       ├── matches/route.ts          # GET — matches with predictions/verification
+│       ├── matches/route.ts          # GET — matches with intelligence status
+│       ├── intelligence/route.ts     # POST — 5-agent specialist analysis
+│       ├── consensus/route.ts        # POST — BFT consensus (legacy)
 │       ├── predict/route.ts          # POST — ensemble prediction
-│       ├── consensus/route.ts        # POST — full BFT consensus
-│       ├── intelligence/route.ts     # POST — specialist agent analysis
 │       ├── reports/
 │       │   ├── catalog/route.ts      # GET — premium report catalog
-│       │   └── generate/route.ts     # POST — generate premium report
+│       │   └── generate/route.ts     # POST — generate premium report (x402)
 │       └── market/
 │           ├── route.ts              # GET — prediction market odds
 │           ├── stake/route.ts        # POST — place a stake
@@ -239,8 +199,8 @@ goalconsensus/
 ├── lib/
 │   ├── agents/
 │   │   ├── types.ts                  # 15+ types: specialist agents, debate, reports, markets
-│   │   ├── index.ts                  # Agent registry (legacy + 5 specialists)
-│   │   ├── tactical-analyst.ts       # Specialist — formation, pressing, set pieces
+│   │   ├── index.ts                  # Agent registry
+│   │   ├── tactical-analyst.ts       # Specialist — formations, pressing, set pieces
 │   │   ├── statistical-agent.ts      # Specialist — Poisson, Monte Carlo, xG
 │   │   ├── market-analyst.ts         # Specialist — odds, value, line movement
 │   │   ├── injury-analyst.ts         # Specialist — fitness, recovery, depth
@@ -270,10 +230,15 @@ goalconsensus/
 │   ├── DebateFeed.tsx                # AI debate message feed
 │   ├── PremiumReportCard.tsx         # Premium report purchase card
 │   ├── PredictionMarketPanel.tsx     # Prediction market interface
-│   ├── ConsensusDisplay.tsx          # AI Ensemble / BFT display
+│   ├── ConsensusDisplay.tsx          # AI ensemble / BFT display
 │   ├── VerificationTimeline.tsx      # Step-by-step verification
-│   ├── MatchCard.tsx                 # Match cards
-│   └── Header.tsx                    # Terminal / Developers / Docs nav
+│   ├── ConfidenceGauge.tsx           # Consensus confidence ring
+│   ├── MatchCard.tsx                 # Match cards with intelligence status
+│   ├── SearchBar.tsx                 # Match search with autocomplete
+│   ├── EmptyState.tsx                # Empty/error state component
+│   ├── Skeleton.tsx                  # Loading skeletons
+│   ├── Header.tsx                    # Terminal / Developers / Docs nav
+│   └── ProviderStatus.tsx            # Provider health display
 ├── mcp-server/
 │   └── index.ts                      # MCP Server v4.0.0 (15 tools)
 ├── package.json
@@ -283,6 +248,20 @@ goalconsensus/
 ├── render.yaml
 └── .env.example
 ```
+
+---
+
+## Test Coverage
+
+24 tests covering:
+- Football match consensus (SETTLE, DO_NOT_SETTLE, PENDING)
+- Unsupported sports rejection
+- Provider timeout and insufficient data
+- Provider disagreement handling
+- LLM unavailability and zero-confidence agents
+- Evidence aggregation across agents
+- Confidence calculation and minority opinion
+- Canonical state propagation
 
 ---
 

@@ -36,9 +36,9 @@ const AGENT_ICONS: Record<string, LucideIcon> = {
 };
 
 const STANCE_CONFIG: Record<DebateMessage["stance"], { color: string; label: string; emoji: string }> = {
-  agree: { color: "accent-green", label: "Agrees", emoji: "" },
-  disagree: { color: "accent-red", label: "Disagrees", emoji: "" },
-  neutral: { color: "accent-yellow", label: "Neutral", emoji: "" },
+  agree: { color: "accent-green", label: "Supports consensus", emoji: "" },
+  disagree: { color: "accent-red", label: "Challenges consensus", emoji: "" },
+  neutral: { color: "accent-yellow", label: "Nuanced position", emoji: "" },
 };
 
 function TypingIndicator({ agentName }: { agentName: string }) {
@@ -118,6 +118,11 @@ export default function DebateFeed({ messages, isVisible }: DebateFeedProps) {
             <p className="text-xs leading-relaxed text-text-secondary pl-9.5">
               {msg.position}
             </p>
+            {msg.reasoning && msg.reasoning !== msg.position && (
+              <p className="text-2xs leading-relaxed text-text-muted pl-9.5 mt-1.5 italic">
+                {msg.reasoning}
+              </p>
+            )}
           </div>
         );
       })}

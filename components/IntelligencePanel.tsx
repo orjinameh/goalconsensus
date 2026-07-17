@@ -342,15 +342,50 @@ export function IntelligencePanel({ homeTeam, awayTeam, onBack }: IntelligencePa
                         {consensusAgreement} of {consensusTotal}
                       </span>
                     </div>
-                    {debate?.minorityOpinion && (
-                      <div className="mt-3 bg-accent-yellow-dim border border-accent-yellow/20 rounded-lg p-3">
-                        <span className="text-2xs font-medium text-accent-yellow">Dissenting view</span>
-                        <p className="text-2xs text-text-secondary mt-1 leading-relaxed">
-                          {debate.minorityOpinion.agent}: {debate.minorityOpinion.position}
-                        </p>
-                      </div>
-                    )}
                   </div>
+
+                  {/* Agent breakdown — who agrees, who dissents */}
+                  {specialists.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-border-subtle">
+                      <div className="text-2xs text-text-muted uppercase tracking-wider font-medium mb-2.5">
+                        Agent Positions
+                      </div>
+                      <div className="space-y-2">
+                        {specialists.map((s) => {
+                          const agreesWithConsensus = s.prediction.winner === consensusWinner;
+                          return (
+                            <div key={s.agentId} className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  "w-1.5 h-1.5 rounded-full shrink-0",
+                                  agreesWithConsensus ? "bg-accent-green" : "bg-accent-red"
+                                )}
+                              />
+                              <span className="text-2xs text-text-secondary flex-1 truncate">
+                                {s.agentName}
+                              </span>
+                              <span className={cn(
+                                "text-2xs font-medium shrink-0",
+                                agreesWithConsensus ? "text-accent-green" : "text-accent-red"
+                              )}>
+                                {s.prediction.winner}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Minority opinion */}
+                  {debate?.minorityOpinion && (
+                    <div className="mt-4 bg-accent-yellow-dim border border-accent-yellow/20 rounded-lg p-3">
+                      <span className="text-2xs font-medium text-accent-yellow">Dissenting view</span>
+                      <p className="text-2xs text-text-secondary mt-1 leading-relaxed">
+                        {debate.minorityOpinion.agent}: {debate.minorityOpinion.position}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Prediction Market */}

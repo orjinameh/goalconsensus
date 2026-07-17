@@ -21,13 +21,13 @@ const statusConfig: Record<
   { label: string; color: string; bg: string; icon: typeof CheckCircle2 }
 > = {
   SETTLE: {
-    label: "Verified",
+    label: "Consensus",
     color: "text-accent-green",
     bg: "bg-accent-green-dim border-accent-green/20",
     icon: CheckCircle2,
   },
   DO_NOT_SETTLE: {
-    label: "Disputed",
+    label: "Contested",
     color: "text-accent-red",
     bg: "bg-accent-red-dim border-accent-red/20",
     icon: XCircle,

@@ -17,6 +17,9 @@ import {
   Code2,
   Sparkles,
   ArrowUpRight,
+  Cpu,
+  Scale,
+  MessageSquare,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { SearchBar } from "@/components/SearchBar";
@@ -28,19 +31,93 @@ import { cn } from "@/lib/utils";
 import type { MatchWithConsensus } from "@/lib/api";
 
 const SPECIALIST_AGENTS = [
-  { id: "tactical", name: "Tactical", icon: Target, color: "text-accent-blue", description: "Formations & pressing" },
-  { id: "statistical", name: "Statistical", icon: BarChart3, color: "text-accent-green", description: "Poisson & xG models" },
-  { id: "market", name: "Market", icon: TrendingUp, color: "text-accent-yellow", description: "Odds & value detection" },
-  { id: "injury", name: "Injury", icon: HeartPulse, color: "text-accent-red", description: "Squad fitness analysis" },
-  { id: "news", name: "News", icon: Newspaper, color: "text-accent-purple", description: "Form & context" },
+  {
+    id: "tactical",
+    name: "Tactical Analyst",
+    icon: Target,
+    color: "text-accent-blue",
+    colorDim: "bg-accent-blue-dim",
+    tagline: "Formations, pressing triggers, and shape analysis",
+    input: "Team lineups & match context",
+    output: "Tactical prediction + reasoning",
+    latency: "~80ms",
+    tools: ["match_analysis", "compare_teams"],
+  },
+  {
+    id: "statistical",
+    name: "Statistical Agent",
+    icon: BarChart3,
+    color: "text-accent-green",
+    colorDim: "bg-accent-green-dim",
+    tagline: "Poisson models, xG, and historical patterns",
+    input: "Historical stats & form data",
+    output: "Score probability distribution",
+    latency: "~60ms",
+    tools: ["historical_analysis", "qualification_scenarios"],
+  },
+  {
+    id: "market",
+    name: "Market Analyst",
+    icon: TrendingUp,
+    color: "text-accent-yellow",
+    colorDim: "bg-accent-yellow-dim",
+    tagline: "Betting odds, value detection, and market sentiment",
+    input: "Live odds from 5+ bookmakers",
+    output: "Value bets + market consensus",
+    latency: "~40ms",
+    tools: ["market_analysis"],
+  },
+  {
+    id: "injury",
+    name: "Injury Analyst",
+    icon: HeartPulse,
+    color: "text-accent-red",
+    colorDim: "bg-accent-red-dim",
+    tagline: "Squad fitness, suspensions, and lineup impact",
+    input: "Injury reports & squad news",
+    output: "Availability assessment + impact score",
+    latency: "~50ms",
+    tools: ["injury_report", "player_report"],
+  },
+  {
+    id: "news",
+    name: "News Analyst",
+    icon: Newspaper,
+    color: "text-accent-purple",
+    colorDim: "bg-accent-purple-dim",
+    tagline: "Recent form, motivation, and contextual factors",
+    input: "News feeds & recent developments",
+    output: "Contextual intelligence + confidence",
+    latency: "~70ms",
+    tools: ["news_analysis"],
+  },
 ];
 
-const PIPELINE_STEPS = [
-  { icon: <Globe size={10} />, label: "Live Data" },
-  { icon: <Zap size={10} />, label: "Canonical State" },
-  { icon: <Brain size={10} />, label: "5 AI Agents" },
-  { icon: <GitBranch size={10} />, label: "Live Debate" },
-  { icon: <Lock size={10} />, label: "Consensus" },
+const HOW_IT_WORKS = [
+  {
+    step: "01",
+    icon: Globe,
+    title: "Ingest",
+    description: "We pull live data from 5+ football APIs — odds, injuries, form, lineups — and build a canonical match state.",
+  },
+  {
+    step: "02",
+    icon: Brain,
+    title: "Analyze",
+    description: "Five specialist AI agents independently analyze the match from different angles, each producing a prediction with evidence.",
+  },
+  {
+    step: "03",
+    icon: MessageSquare,
+    title: "Debate",
+    description: "Agents present their positions, challenge each other's reasoning, and identify areas of agreement and disagreement.",
+  },
+  {
+    step: "04",
+    icon: Scale,
+    title: "Consensus",
+    description: "A final weighted verdict emerges — with confidence scores, agreement metrics, and minority opinions preserved.",
+  },
 ];
 
 export default function HomePage() {
@@ -137,7 +214,6 @@ export default function HomePage() {
       <main>
         {/* Hero */}
         <section className="relative px-5 pt-20 sm:pt-28 pb-12 overflow-hidden">
-          {/* Subtle radial glow behind hero */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-accent-green/[0.04] rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative max-w-3xl mx-auto text-center">
@@ -152,8 +228,8 @@ export default function HomePage() {
             </h1>
 
             <p className="text-base sm:text-lg text-text-secondary max-w-xl mx-auto leading-relaxed mb-8">
-              GoalConsensus is the intelligence layer for the 2026 World Cup.
-              Five specialist AI agents analyze every match, debate the outcome, and deliver a single trusted verdict.
+              Football intelligence is broken. Single sources, no debate, no accountability.
+              GoalConsensus fixes this: five specialist AI agents independently analyze every match, debate their positions, and produce a single transparent verdict you can verify.
             </p>
 
             <div className="max-w-xl mx-auto mb-8">
@@ -184,45 +260,104 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Pipeline strip */}
+        {/* Stats bar */}
         <section className="px-5 pb-12">
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-center justify-center gap-1 sm:gap-2 text-2xs text-text-muted overflow-x-auto no-scrollbar py-2">
-              {PIPELINE_STEPS.map((item, i) => (
-                <div key={item.label} className="flex items-center gap-1 sm:gap-2 shrink-0">
-                  {i > 0 && <span className="text-text-muted/50 text-2xs">&rarr;</span>}
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-2 border border-border-subtle rounded-md">
-                    {item.icon}
-                    <span>{item.label}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { value: "5", label: "Specialist Agents", icon: Brain },
+                { value: "15", label: "MCP Tools", icon: Cpu },
+                { value: "~80ms", label: "Avg. Latency", icon: Zap },
+                { value: "$0.002", label: "Per Report", icon: Lock },
+              ].map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <div key={stat.label} className="bg-surface-2 border border-border-subtle rounded-xl px-4 py-3 text-center">
+                    <Icon size={14} className="text-accent-green mx-auto mb-1.5" />
+                    <div className="text-lg font-bold text-text-primary tabular-nums">{stat.value}</div>
+                    <div className="text-2xs text-text-muted">{stat.label}</div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
 
-        {/* Specialist Agents */}
+        {/* How it works */}
         <section className="px-5 pb-16">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-8">
-              <h2 className="text-lg font-semibold text-text-primary mb-2">Meet the Agents</h2>
+              <h2 className="text-lg font-semibold text-text-primary mb-2">How it works</h2>
               <p className="text-sm text-text-tertiary max-w-md mx-auto">
-                Each agent is an independent domain expert. They analyze the same match from different angles, then debate to reach consensus.
+                From raw data to trusted verdict in four stages. Every step is transparent.
               </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {HOW_IT_WORKS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.step} className="bg-surface-2 border border-border-subtle rounded-xl p-5 relative">
+                    <div className="text-2xs font-mono text-accent-green/40 font-bold mb-3">{item.step}</div>
+                    <div className="w-9 h-9 rounded-xl bg-accent-green-dim flex items-center justify-center mb-3">
+                      <Icon size={16} className="text-accent-green" />
+                    </div>
+                    <div className="text-sm font-semibold text-text-primary mb-1.5">{item.title}</div>
+                    <div className="text-xs text-text-tertiary leading-relaxed">{item.description}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* Specialist Agents — Marketplace */}
+        <section className="px-5 pb-16">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-lg font-semibold text-text-primary mb-2">The Agent Marketplace</h2>
+              <p className="text-sm text-text-tertiary max-w-lg mx-auto">
+                Each agent is an independent domain expert with its own analysis pipeline.
+                They work alone, then debate together to produce a single verdict.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {SPECIALIST_AGENTS.map((agent) => {
                 const Icon = agent.icon;
                 return (
                   <div
                     key={agent.id}
-                    className="group bg-surface-2 border border-border-subtle rounded-xl p-4 text-center hover:border-border transition-all duration-200 hover:bg-surface-3"
+                    className="group bg-surface-2 border border-border-subtle rounded-xl p-5 hover:border-border transition-all duration-200 hover:bg-surface-3"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-surface-3 group-hover:bg-surface-4 flex items-center justify-center mx-auto mb-3 transition-colors">
-                      <Icon size={18} className={agent.color} />
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", agent.colorDim)}>
+                        <Icon size={18} className={agent.color} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-text-primary">{agent.name}</div>
+                        <div className="text-2xs text-text-tertiary leading-snug mt-0.5">{agent.tagline}</div>
+                      </div>
                     </div>
-                    <div className="text-xs font-medium text-text-primary mb-0.5">{agent.name}</div>
-                    <div className="text-2xs text-text-muted">{agent.description}</div>
+                    <div className="space-y-2 text-2xs">
+                      <div className="flex items-start gap-2">
+                        <span className="text-text-muted shrink-0 w-12">Input</span>
+                        <span className="text-text-secondary">{agent.input}</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-text-muted shrink-0 w-12">Output</span>
+                        <span className="text-text-secondary">{agent.output}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-text-muted shrink-0 w-12">Latency</span>
+                        <span className="text-text-secondary font-mono">{agent.latency}</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-border-subtle flex items-center gap-1.5 flex-wrap">
+                      {agent.tools.map((tool) => (
+                        <span key={tool} className="text-2xs font-mono text-text-muted bg-surface-3 px-1.5 py-0.5 rounded">
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
@@ -299,7 +434,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Developer CTA */}
+        {/* Developer Platform CTA */}
         <section className="px-5 pb-16">
           <div className="max-w-3xl mx-auto">
             <div className="bg-surface-2 border border-border-subtle rounded-2xl p-6 sm:p-8 relative overflow-hidden">
@@ -311,14 +446,14 @@ export default function HomePage() {
                 <div className="flex-1">
                   <h3 className="text-base font-semibold text-text-primary mb-1.5">Built for developers</h3>
                   <p className="text-sm text-text-tertiary leading-relaxed mb-4">
-                    GoalConsensus exposes every capability via MCP tools and REST APIs.
-                    Build autonomous agents, prediction markets, or fan apps on top of our intelligence layer.
+                    Every capability — analysis, debate, consensus, premium reports, prediction markets — is exposed via MCP tools and REST APIs.
+                    Build autonomous agents, fan apps, or analytics platforms on top of GoalConsensus.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                     {[
-                      { label: "MCP Server", desc: "15 tools for agents", icon: Globe },
+                      { label: "MCP Server", desc: "15 tools for AI agents", icon: Globe },
                       { label: "x402 Payments", desc: "Per-query micropayments", icon: Lock },
-                      { label: "5 Agent Skills", desc: "Specialist intelligence", icon: Brain },
+                      { label: "REST API", desc: "Full intelligence stack", icon: Zap },
                     ].map((item) => {
                       const Icon = item.icon;
                       return (
@@ -365,6 +500,21 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
+  const quickStart = `# 1. Install dependencies
+npm install
+
+# 2. Set environment variables
+export GEMINI_API_KEY="your-key"
+export FOOTBALL_DATA_API_KEY="your-key"
+
+# 3. Start the server
+npm run dev
+
+# 4. Query intelligence
+curl -X POST http://localhost:3000/api/intelligence \\
+  -H "Content-Type: application/json" \\
+  -d '{"homeTeam":"Spain","awayTeam":"Argentina"}'`;
+
   const mcpConfig = `{
   "mcpServers": {
     "goalconsensus": {
@@ -378,18 +528,20 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
   }
 }`;
 
-  const curlExample = `curl -X POST http://localhost:3000/api/intelligence \\
-  -H "Content-Type: application/json" \\
-  -d '{"homeTeam":"Spain","awayTeam":"Argentina"}'`;
-
   const responseExample = `{
   "specialistOutputs": [
     {
       "agentId": "tactical-analyst",
       "agentName": "Tactical Analyst",
       "confidence": 72,
-      "prediction": { "winner": "Spain", "homeScore": 2, "awayScore": 1 },
-      "evidence": [...]
+      "prediction": {
+        "winner": "Spain",
+        "homeScore": 2,
+        "awayScore": 1
+      },
+      "evidence": [
+        { "source": "formation-analysis", "detail": "Spain's 4-3-3 high press...", "weight": 0.85 }
+      ]
     }
     // ... 4 more agents
   ],
@@ -398,12 +550,16 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
       "winner": "Spain",
       "confidence": 71,
       "agreement": 4,
-      "totalAgents": 5
+      "totalAgents": 5,
+      "minorityOpinion": {
+        "agent": "Market Analyst",
+        "position": "Odds suggest tighter match..."
+      }
     }
   }
 }`;
 
-  const snippets = [mcpConfig, curlExample, responseExample];
+  const snippets = [quickStart, mcpConfig, responseExample];
 
   return (
     <div className="min-h-screen">
@@ -419,6 +575,29 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
+        {/* Quick Start */}
+        <section className="bg-surface-2 border border-border-subtle rounded-xl p-6 mb-6">
+          <h2 className="text-base font-semibold text-text-primary mb-2 flex items-center gap-2">
+            <Zap size={16} className="text-accent-green" />
+            Quick Start
+          </h2>
+          <p className="text-sm text-text-secondary mb-4">
+            Get running in four commands. No API key required for core tools — bring your own for full agent analysis.
+          </p>
+          <div className="relative bg-surface-3 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
+              <span className="text-2xs text-text-muted font-mono">Terminal</span>
+              <button
+                onClick={() => copySnippet(quickStart, 0)}
+                className="text-2xs text-text-muted hover:text-text-secondary transition-colors"
+              >
+                {copiedIdx === 0 ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <pre className="p-4 text-xs text-text-secondary font-mono overflow-x-auto leading-relaxed">{quickStart}</pre>
+          </div>
+        </section>
+
         <div className="space-y-6">
           {/* MCP Server */}
           <section className="bg-surface-2 border border-border-subtle rounded-xl p-6">
@@ -428,45 +607,34 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
             </h2>
             <p className="text-sm text-text-secondary mb-4">
               Connect any MCP-compatible client (Claude Desktop, Cursor, custom agents) to 15 intelligence tools.
+              Each tool includes full reasoning chains and evidence attribution.
             </p>
             <div className="relative bg-surface-3 rounded-lg overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
                 <span className="text-2xs text-text-muted font-mono">claude_desktop_config.json</span>
                 <button
-                  onClick={() => copySnippet(mcpConfig, 0)}
+                  onClick={() => copySnippet(mcpConfig, 1)}
                   className="text-2xs text-text-muted hover:text-text-secondary transition-colors"
                 >
-                  {copiedIdx === 0 ? "Copied" : "Copy"}
+                  {copiedIdx === 1 ? "Copied" : "Copy"}
                 </button>
               </div>
               <pre className="p-4 text-xs text-text-secondary font-mono overflow-x-auto leading-relaxed">{mcpConfig}</pre>
             </div>
           </section>
 
-          {/* REST API */}
+          {/* REST API + Response */}
           <section className="bg-surface-2 border border-border-subtle rounded-xl p-6">
             <h2 className="text-base font-semibold text-text-primary mb-2 flex items-center gap-2">
-              <Zap size={16} className="text-accent-green" />
+              <Cpu size={16} className="text-accent-purple" />
               REST API
             </h2>
             <p className="text-sm text-text-secondary mb-4">
-              Full intelligence analysis via a single POST request. No API key required for core tools.
+              Full 5-agent specialist analysis via a single POST request. Returns individual agent predictions, debate transcript, and final consensus.
             </p>
-            <div className="relative bg-surface-3 rounded-lg overflow-hidden mb-3">
-              <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
-                <span className="text-2xs text-text-muted font-mono">Request</span>
-                <button
-                  onClick={() => copySnippet(curlExample, 1)}
-                  className="text-2xs text-text-muted hover:text-text-secondary transition-colors"
-                >
-                  {copiedIdx === 1 ? "Copied" : "Copy"}
-                </button>
-              </div>
-              <pre className="p-4 text-xs text-text-secondary font-mono overflow-x-auto leading-relaxed">{curlExample}</pre>
-            </div>
             <div className="relative bg-surface-3 rounded-lg overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
-                <span className="text-2xs text-text-muted font-mono">Response</span>
+                <span className="text-2xs text-text-muted font-mono">Response preview</span>
                 <button
                   onClick={() => copySnippet(responseExample, 2)}
                   className="text-2xs text-text-muted hover:text-text-secondary transition-colors"
@@ -478,30 +646,27 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
             </div>
           </section>
 
-          {/* Agent Skills */}
+          {/* What you can build */}
           <section className="bg-surface-2 border border-border-subtle rounded-xl p-6">
             <h2 className="text-base font-semibold text-text-primary mb-2 flex items-center gap-2">
-              <Brain size={16} className="text-accent-purple" />
-              Agent Skills
+              <Sparkles size={16} className="text-accent-yellow" />
+              What you can build
             </h2>
             <p className="text-sm text-text-secondary mb-4">
-              Five specialist agents, each with unique domain expertise, available as MCP tools.
+              GoalConsensus is a building block, not a walled garden. Here are some patterns.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {SPECIALIST_AGENTS.map((agent) => {
-                const Icon = agent.icon;
-                return (
-                  <div key={agent.id} className="flex items-center gap-3 bg-surface-3 rounded-lg p-3">
-                    <div className="w-8 h-8 rounded-lg bg-surface-4 flex items-center justify-center shrink-0">
-                      <Icon size={14} className={agent.color} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-text-primary">{agent.name} Agent</div>
-                      <div className="text-2xs text-text-muted">{agent.description}</div>
-                    </div>
-                  </div>
-                );
-              })}
+              {[
+                { title: "Autonomous betting agents", desc: "MCP tools let AI agents fetch intelligence, compare odds, and place stakes programmatically." },
+                { title: "Fan engagement apps", desc: "Embed consensus predictions into match previews, live blogs, or social content." },
+                { title: "Analytics dashboards", desc: "Track agent agreement trends, confidence shifts, and prediction accuracy over time." },
+                { title: "Prediction markets", desc: "Use consensus as an oracle for on-chain prediction market settlement." },
+              ].map((item) => (
+                <div key={item.title} className="bg-surface-3 border border-border-subtle rounded-lg p-4">
+                  <div className="text-xs font-medium text-text-primary mb-1">{item.title}</div>
+                  <div className="text-2xs text-text-muted leading-relaxed">{item.desc}</div>
+                </div>
+              ))}
             </div>
           </section>
 
@@ -512,19 +677,22 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
               x402 Micropayments
             </h2>
             <p className="text-sm text-text-secondary mb-4">
-              Premium intelligence reports gated behind x402 protocol. Per-query payments from 0.002 to 0.01 USDC.
+              Premium intelligence reports are gated behind HTTP 402. Pay per query with USDC — no subscriptions, no API keys, no rate limits. The browser pays automatically.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { label: "Full Tactical Breakdown", price: "0.005 USDC" },
-                { label: "Historical Deep Dive", price: "0.003 USDC" },
-                { label: "Player Impact Report", price: "0.002 USDC" },
-                { label: "Market Intelligence", price: "0.004 USDC" },
-                { label: "Risk Assessment", price: "0.01 USDC" },
+                { label: "Full Tactical Breakdown", price: "0.005 USDC", desc: "Formation analysis, pressing triggers, key matchups" },
+                { label: "Historical Deep Dive", price: "0.003 USDC", desc: "Head-to-head records, venue trends, seasonal patterns" },
+                { label: "Player Impact Report", price: "0.002 USDC", desc: "Key player form, suspension risk, lineup impact" },
+                { label: "Market Intelligence", price: "0.004 USDC", desc: "Odds movement, sharp money, value detection" },
+                { label: "Risk Assessment", price: "0.01 USDC", desc: "Comprehensive risk factors, red flags, confidence intervals" },
               ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between bg-surface-3 rounded-lg px-3 py-2.5">
-                  <span className="text-xs text-text-secondary">{item.label}</span>
-                  <span className="text-2xs font-mono font-medium text-accent-yellow">{item.price}</span>
+                <div key={item.label} className="bg-surface-3 rounded-lg px-3 py-2.5">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-medium text-text-secondary">{item.label}</span>
+                    <span className="text-2xs font-mono font-medium text-accent-yellow">{item.price}</span>
+                  </div>
+                  <div className="text-2xs text-text-muted">{item.desc}</div>
                 </div>
               ))}
             </div>
@@ -533,7 +701,7 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
           {/* MCP Tools Catalog */}
           <section className="bg-surface-2 border border-border-subtle rounded-xl p-6">
             <h2 className="text-base font-semibold text-text-primary mb-2 flex items-center gap-2">
-              <Sparkles size={16} className="text-accent-green" />
+              <Cpu size={16} className="text-accent-green" />
               MCP Tools Catalog
             </h2>
             <p className="text-sm text-text-secondary mb-4">
@@ -541,25 +709,28 @@ function DevelopersPage({ onBack }: { onBack: () => void }) {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
-                { name: "analyze_match", cat: "Intelligence" },
-                { name: "compare_teams", cat: "Intelligence" },
-                { name: "historical_analysis", cat: "Intelligence" },
-                { name: "predict_match", cat: "Prediction" },
-                { name: "market_analysis", cat: "Specialist" },
-                { name: "player_report", cat: "Specialist" },
-                { name: "injury_report", cat: "Specialist" },
-                { name: "premium_report", cat: "Premium" },
-                { name: "verify_result", cat: "Verification" },
-                { name: "verify_settlement", cat: "Verification" },
-                { name: "get_provider_consensus", cat: "Verification" },
-                { name: "consensus", cat: "Legacy" },
-                { name: "get_live_matches", cat: "General" },
-                { name: "get_report_catalog", cat: "Premium" },
-                { name: "qualification_scenarios", cat: "Intelligence" },
+                { name: "analyze_match", cat: "Intelligence", desc: "Full 5-agent analysis" },
+                { name: "compare_teams", cat: "Intelligence", desc: "Head-to-head comparison" },
+                { name: "historical_analysis", cat: "Intelligence", desc: "Historical patterns & trends" },
+                { name: "predict_match", cat: "Prediction", desc: "Ensemble prediction" },
+                { name: "market_analysis", cat: "Specialist", desc: "Market odds & value" },
+                { name: "player_report", cat: "Specialist", desc: "Player form & impact" },
+                { name: "injury_report", cat: "Specialist", desc: "Squad fitness & availability" },
+                { name: "premium_report", cat: "Premium", desc: "Deep-dive analysis (x402)" },
+                { name: "verify_result", cat: "Verification", desc: "Result verification" },
+                { name: "verify_settlement", cat: "Verification", desc: "Settlement verification" },
+                { name: "get_provider_consensus", cat: "Verification", desc: "Multi-source consensus" },
+                { name: "consensus", cat: "Legacy", desc: "BFT consensus (v3)" },
+                { name: "get_live_matches", cat: "General", desc: "Active fixtures" },
+                { name: "get_report_catalog", cat: "Premium", desc: "Available reports" },
+                { name: "qualification_scenarios", cat: "Intelligence", desc: "Qualification math" },
               ].map((tool) => (
                 <div key={tool.name} className="flex items-center justify-between bg-surface-3 rounded-lg px-3 py-2">
-                  <span className="text-xs font-mono text-text-secondary">{tool.name}</span>
-                  <span className="text-2xs text-text-muted">{tool.cat}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-mono text-text-secondary">{tool.name}</span>
+                    <span className="text-2xs text-text-muted ml-2 hidden sm:inline">{tool.desc}</span>
+                  </div>
+                  <span className="text-2xs text-text-muted shrink-0 ml-2">{tool.cat}</span>
                 </div>
               ))}
             </div>
