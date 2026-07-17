@@ -44,6 +44,8 @@ export function ConfidenceGauge({
           height={size}
           viewBox={`0 0 ${size} ${size}`}
           className="transform -rotate-90"
+          role="img"
+          aria-label={`Consensus confidence: ${Math.round(value)}%`}
         >
           <circle
             cx={size / 2}
@@ -80,13 +82,13 @@ export function ConfidenceGauge({
         <div className="text-center">
           <div className={cn("text-xs font-medium", colorClass)}>
             {level === "high"
-              ? "High Confidence"
+              ? "Strong Consensus"
               : level === "medium"
-                ? "Medium Confidence"
-                : "Low Confidence"}
+                ? "Moderate Consensus"
+                : "Weak Consensus"}
           </div>
           <div className="text-2xs text-text-muted mt-0.5">
-            Model certainty
+            {Math.round(value)}% confidence
           </div>
         </div>
       )}

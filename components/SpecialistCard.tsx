@@ -144,7 +144,7 @@ export function SpecialistCard({
                 {agent.agentName}
               </div>
               <div className="text-2xs text-text-muted font-mono">
-                {agent.agentId}
+                {formatMs(agent.latencyMs)} &middot; {agent.evidence.length} evidence points
               </div>
             </div>
           </div>
@@ -152,26 +152,16 @@ export function SpecialistCard({
             {isAnimating ? (
               <div className="w-12 h-4 rounded bg-surface-4 shimmer-bg" />
             ) : (
-              <>
-                <span
-                  className={cn("text-sm font-bold tabular-nums", colorClass)}
-                >
-                  {Math.round(agent.confidence)}%
-                </span>
-                <div className="text-2xs text-text-muted font-mono">
-                  {formatMs(agent.latencyMs)}
-                </div>
-              </>
+              <span
+                className={cn("text-sm font-bold tabular-nums", colorClass)}
+              >
+                {Math.round(agent.confidence)}%
+              </span>
             )}
           </div>
         </div>
 
         <div className="mb-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-2xs text-text-muted uppercase tracking-wider font-medium">
-              Confidence
-            </span>
-          </div>
           <div className="h-1.5 rounded-full bg-surface-4 overflow-hidden">
             <div
               className={cn(

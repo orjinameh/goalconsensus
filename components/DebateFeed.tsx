@@ -35,27 +35,21 @@ const AGENT_ICONS: Record<string, LucideIcon> = {
   "news-analyst": Newspaper,
 };
 
-const STANCE_COLORS: Record<DebateMessage["stance"], string> = {
-  agree: "accent-green",
-  disagree: "accent-red",
-  neutral: "accent-yellow",
+const STANCE_CONFIG: Record<DebateMessage["stance"], { color: string; label: string; emoji: string }> = {
+  agree: { color: "accent-green", label: "Agrees", emoji: "" },
+  disagree: { color: "accent-red", label: "Disagrees", emoji: "" },
+  neutral: { color: "accent-yellow", label: "Neutral", emoji: "" },
 };
 
-const STANCE_LABELS: Record<DebateMessage["stance"], string> = {
-  agree: "Agrees",
-  disagree: "Disagrees",
-  neutral: "Neutral",
-};
-
-function TypingIndicator() {
+function TypingIndicator({ agentName }: { agentName: string }) {
   return (
-    <div className="flex items-center gap-1.5 px-4 py-3">
+    <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex gap-1">
-        <span className="h-2 w-2 animate-bounce rounded-full bg-text-muted [animation-delay:-0.3s]" />
-        <span className="h-2 w-2 animate-bounce rounded-full bg-text-muted [animation-delay:-0.15s]" />
-        <span className="h-2 w-2 animate-bounce rounded-full bg-text-muted" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted" />
       </div>
-      <span className="ml-1 text-xs text-text-muted">Analyzing...</span>
+      <span className="text-xs text-text-muted">{agentName} is analyzing...</span>
     </div>
   );
 }
@@ -74,7 +68,7 @@ export default function DebateFeed({ messages, isVisible }: DebateFeedProps) {
     const timers: NodeJS.Timeout[] = [];
     for (let i = 0; i < messages.length; i++) {
       timers.push(
-        setTimeout(() => setVisibleCount(i + 1), (i + 1) * 400)
+        setTimeout(() => setVisibleCount(i + 1), (i + 1) * 350)
       );
     }
     return () => timers.forEach(clearTimeout);
@@ -84,66 +78,53 @@ export default function DebateFeed({ messages, isVisible }: DebateFeedProps) {
 
   const displayed = messages.slice(0, visibleCount);
   const isTyping = visibleCount < messages.length;
+  const nextAgent = isTyping ? messages[visibleCount] : null;
 
   return (
-    <div className="flex flex-col gap-4 overflow-y-auto p-4">
+    <div className="flex flex-col gap-3 overflow-y-auto">
       {displayed.map((msg, idx) => {
         const Icon = AGENT_ICONS[msg.agentId] ?? Target;
-        const stanceColor = STANCE_COLORS[msg.stance];
-        const delayClass = `animate-delay-${String((idx % 5) * 75)}`;
+        const stance = STANCE_CONFIG[msg.stance];
 
         return (
           <div
             key={`${msg.agentId}-${msg.timestamp}-${idx}`}
             className={cn(
-              "animate-fade-in-up rounded-xl border border-border-subtle bg-surface-2 p-4 opacity-0",
-              delayClass
+              "debate-bubble animate-fade-in-up opacity-0",
+              msg.stance === "agree" && "debate-bubble-agree",
+              msg.stance === "disagree" && "debate-bubble-disagree",
+              msg.stance === "neutral" && "debate-bubble-neutral"
             )}
           >
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg bg-surface-3"
-                  )}
-                >
-                  <Icon className={cn("h-4 w-4", `text-${stanceColor}`)} />
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-3">
+                  <Icon className={cn("h-3.5 w-3.5", `text-${stance.color}`)} />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium text-text-primary">
+                  <span className="text-xs font-medium text-text-primary">
                     {msg.agentName}
                   </span>
-                  <span className={cn("text-xs", `text-${stanceColor}`)}>
-                    {STANCE_LABELS[msg.stance]}
+                  <span className={cn("text-2xs font-medium", `text-${stance.color}`)}>
+                    {stance.label}
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-text-muted">
-                  {Math.round(msg.confidence * 100)}% confidence
-                </span>
-              </div>
-            </div>
-
-            <p className="text-sm leading-relaxed text-text-secondary">
-              {msg.position}
-            </p>
-
-            <div className="mt-2 flex items-center justify-end">
-              <span className="text-[10px] text-text-tertiary">
-                {new Date(msg.timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+              <span className="text-2xs text-text-muted font-mono tabular-nums">
+                {Math.round(msg.confidence * 100)}%
               </span>
             </div>
+
+            <p className="text-xs leading-relaxed text-text-secondary pl-9.5">
+              {msg.position}
+            </p>
           </div>
         );
       })}
 
-      {isTyping && (
-        <div className="animate-fade-in-up rounded-xl border border-border-subtle bg-surface-3 opacity-0">
-          <TypingIndicator />
+      {isTyping && nextAgent && (
+        <div className="debate-bubble border-dashed opacity-60">
+          <TypingIndicator agentName={nextAgent.agentName} />
         </div>
       )}
     </div>

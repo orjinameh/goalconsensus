@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   Check,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,34 +48,33 @@ export function PremiumReportCard({
   return (
     <div
       className={cn(
-        "gradient-border rounded-2xl bg-surface-2 p-5 transition-all duration-250",
-        "hover:scale-[1.02] hover:shadow-elevated-lg",
-        isPurchased && "ring-1 ring-accent-green/30"
+        "bg-surface-2 border rounded-xl p-4 transition-all duration-200",
+        isPurchased
+          ? "border-accent-green/20"
+          : "border-border-subtle hover:border-border"
       )}
     >
-      <div className="flex items-start gap-3 mb-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-green-dim">
-          <IconComponent className="h-5 w-5 text-accent-green" />
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3">
+          <IconComponent className="h-4 w-4 text-accent-yellow" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-          <p className="mt-1 text-xs text-text-tertiary leading-relaxed">
+          <h3 className="text-xs font-semibold text-text-primary">{title}</h3>
+          <p className="mt-0.5 text-2xs text-text-tertiary leading-relaxed">
             {description}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col">
-          <span className="text-xs text-text-muted">Price</span>
-          <span className="text-sm font-semibold text-text-primary">
-            {price}
-          </span>
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
+        <div className="flex items-center gap-1.5">
+          <Lock size={10} className="text-text-muted" />
+          <span className="text-2xs font-mono font-medium text-text-secondary">{price}</span>
         </div>
 
         {isPurchased ? (
-          <div className="flex items-center gap-1.5 text-sm font-medium text-accent-green">
-            <Check className="h-4 w-4 animate-check-pop" />
+          <div className="flex items-center gap-1.5 text-xs font-medium text-accent-green">
+            <Check className="h-3.5 w-3.5" />
             Unlocked
           </div>
         ) : (
@@ -83,19 +83,19 @@ export function PremiumReportCard({
             onClick={() => onPurchase(type)}
             disabled={isLoading}
             className={cn(
-              "btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-xs",
+              "btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-2xs",
               isLoading && "cursor-wait opacity-70"
             )}
           >
             {isLoading ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Processing...
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Generating...
               </>
             ) : (
               <>
                 {priceUSDC} USDC
-                <span className="text-black/60">Unlock with x402</span>
+                <span className="opacity-60">Unlock</span>
               </>
             )}
           </button>

@@ -221,6 +221,7 @@ export function SearchBar({
           aria-expanded={isOpen}
           aria-controls="search-listbox"
           aria-activedescendant={selectedIndex >= 0 ? `search-option-${selectedIndex}` : undefined}
+          aria-label="Search for a match or team"
           className="search-input pl-11 pr-10"
         />
         {query && (
@@ -239,6 +240,7 @@ export function SearchBar({
           ref={listRef}
           id="search-listbox"
           role="listbox"
+          aria-label="Search results"
           className="absolute top-full left-0 right-0 mt-2 bg-surface-3 border border-border rounded-xl shadow-elevated-lg overflow-hidden z-50 max-h-80 overflow-y-auto no-scrollbar"
         >
           {query.trim() && allItems.length > 0 && (

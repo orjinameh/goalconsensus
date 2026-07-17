@@ -82,16 +82,16 @@ export function PredictionMarketPanel({
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent-purple-dim flex items-center justify-center">
-              <Coins size={14} className="text-accent-purple" />
+            <div className="w-7 h-7 rounded-lg bg-accent-purple-dim flex items-center justify-center">
+              <Coins size={13} className="text-accent-purple" />
             </div>
-            <span className="text-sm font-semibold text-text-primary">
+            <span className="text-xs font-semibold text-text-primary">
               Prediction Market
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <Shield size={10} className="text-accent-green" />
-            <span className="text-2xs text-text-muted">USDC</span>
+            <span className="text-2xs text-text-muted">USDC on CCTP</span>
           </div>
         </div>
 
@@ -107,7 +107,7 @@ export function PredictionMarketPanel({
                 onClick={() => setSelectedSide(isSelected ? null : side)}
                 disabled={isResolving}
                 className={cn(
-                  "relative flex flex-col items-center gap-1 p-3 rounded-lg border transition-all duration-200 cursor-pointer",
+                  "relative flex flex-col items-center gap-1 p-3 rounded-lg border transition-all duration-150 cursor-pointer",
                   "focus-ring",
                   isSelected
                     ? "bg-accent-green-dim border-accent-green/40 text-text-primary"
@@ -159,6 +159,7 @@ export function PredictionMarketPanel({
                 "search-input pl-7 pr-4 w-full",
                 "disabled:opacity-50 disabled:cursor-not-allowed"
               )}
+              aria-label="Stake amount in USDC"
             />
           </div>
         </div>
@@ -171,25 +172,21 @@ export function PredictionMarketPanel({
             "text-sm font-semibold transition-all duration-200 cursor-pointer",
             "focus-ring",
             selectedSide && validAmount && !isResolving
-              ? "bg-accent-green text-bg-primary hover:bg-accent-green/90"
+              ? "bg-accent-green text-black hover:bg-accent-green/90"
               : "bg-surface-4 text-text-muted cursor-not-allowed"
           )}
         >
           {isResolving ? (
             <>
               <div className="w-3.5 h-3.5 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin" />
-              Resolving...
+              Resolving market...
             </>
           ) : (
             <>
               <Coins size={14} />
-              Stake USDC
-              {selectedSide && validAmount && (
-                <span className="text-xs opacity-80">
-                  &middot; ${parsedAmount.toFixed(2)} on{" "}
-                  {SIDE_LABELS[selectedSide]}
-                </span>
-              )}
+              {selectedSide && validAmount
+                ? `Stake $${parsedAmount.toFixed(2)} on ${SIDE_LABELS[selectedSide]}`
+                : "Place stake"}
             </>
           )}
         </button>
@@ -227,9 +224,9 @@ export function PredictionMarketPanel({
 
       <div className="px-4 py-3 bg-surface-3 border-t border-border-subtle">
         <div className="flex items-center gap-2">
-          <ArrowRightLeft size={12} className="text-accent-blue" />
+          <ArrowRightLeft size={11} className="text-accent-blue shrink-0" />
           <span className="text-2xs text-text-muted">
-            Bridge USDC via CCTP to participate
+            Bridge USDC via CCTP to deposit and participate in markets
           </span>
         </div>
       </div>

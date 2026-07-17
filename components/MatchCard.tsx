@@ -33,19 +33,19 @@ const statusConfig: Record<
     icon: XCircle,
   },
   PENDING: {
-    label: "Pending",
+    label: "Analyzing",
     color: "text-accent-yellow",
     bg: "bg-accent-yellow-dim border-accent-yellow/20",
     icon: Clock,
   },
   INSUFFICIENT_DATA: {
-    label: "No Data",
+    label: "Insufficient data",
     color: "text-text-tertiary",
     bg: "bg-surface-3 border-border-subtle",
     icon: AlertTriangle,
   },
   UNSUPPORTED_SPORT: {
-    label: "Unsupported",
+    label: "Not supported",
     color: "text-text-tertiary",
     bg: "bg-surface-3 border-border-subtle",
     icon: AlertTriangle,
@@ -58,8 +58,7 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
   const VerdictIcon = verdict.icon;
   const finished = match.status === "FINISHED";
   const live = match.status === "LIVE";
-  const hasScore =
-    match.homeScore !== null && match.awayScore !== null;
+  const hasScore = match.homeScore !== null && match.awayScore !== null;
   const level = confidenceLevel(v.confidence);
   const colorClass = confidenceColor(level);
 
@@ -72,8 +71,10 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
         "focus-ring cursor-pointer group",
         className
       )}
+      aria-label={`View intelligence for ${match.homeTeam} vs ${match.awayTeam}`}
     >
       <div className="p-4">
+        {/* Top row: status + competition + time */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span
@@ -90,14 +91,14 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
               )}
             </span>
             {match.competition && (
-              <span className="text-2xs text-text-muted">
+              <span className="text-2xs text-text-muted hidden sm:inline">
                 {match.competition}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
             {live && (
-              <span className="flex items-center gap-1 text-2xs text-accent-red">
+              <span className="flex items-center gap-1 text-2xs text-accent-red font-medium">
                 <span className="status-dot status-dot-red" style={{ width: 5, height: 5 }} />
                 LIVE
               </span>
@@ -116,19 +117,20 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
           </div>
         </div>
 
+        {/* Score row */}
         <div className="flex items-center justify-between">
           <div className="flex-1 text-right pr-3">
             <div className="text-sm font-semibold text-text-primary truncate">
               {match.homeTeam}
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <span className="font-mono text-xl font-bold text-text-primary tabular-nums">
-              {hasScore ? match.homeScore : "—"}
+              {hasScore ? match.homeScore : "\u2014"}
             </span>
             <span className="text-text-muted text-xs">vs</span>
             <span className="font-mono text-xl font-bold text-text-primary tabular-nums">
-              {hasScore ? match.awayScore : "—"}
+              {hasScore ? match.awayScore : "\u2014"}
             </span>
           </div>
           <div className="flex-1 text-left pl-3">
@@ -138,6 +140,7 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
           </div>
         </div>
 
+        {/* Bottom row: consensus info + CTA */}
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
           <div className="flex items-center gap-3">
             <div className="text-2xs text-text-muted">
@@ -148,8 +151,8 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
               {v.confidence}%
             </div>
           </div>
-          <div className="text-2xs text-text-muted group-hover:text-text-secondary transition-colors">
-            Verify →
+          <div className="text-2xs text-accent-green font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            Analyze &rarr;
           </div>
         </div>
       </div>

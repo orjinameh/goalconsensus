@@ -24,12 +24,6 @@
     --color-accent-blue: #3b82f6;
     --color-accent-purple: #a855f7;
 
-    --radius-sm: 0.375rem;
-    --radius-md: 0.5rem;
-    --radius-lg: 0.75rem;
-    --radius-xl: 1rem;
-    --radius-2xl: 1.25rem;
-
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   }
@@ -92,11 +86,6 @@
     border: 1px solid rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-  }
-
-  .glass-panel-hover:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.1);
   }
 
   .gradient-text {
@@ -178,19 +167,6 @@
   .status-dot-blue {
     background-color: #3b82f6;
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
-  }
-
-  .evidence-card {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 0.75rem;
-    padding: 1rem;
-    transition: all 150ms ease-out;
-  }
-
-  .evidence-card:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.1);
   }
 
   .search-input {
@@ -281,20 +257,6 @@
     transition: stroke-dashoffset 1s var(--ease-out-expo);
   }
 
-  .step-connector {
-    position: relative;
-  }
-
-  .step-connector::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 100%;
-    width: 1px;
-    height: 1.5rem;
-    background: rgba(255, 255, 255, 0.06);
-  }
-
   .debate-bubble {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -317,36 +279,6 @@
 
   .debate-bubble-neutral {
     border-left: 2px solid #eab308;
-  }
-
-  .typing-dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    animation: typingBounce 1.4s ease-in-out infinite;
-  }
-
-  .typing-dot:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-
-  .typing-dot:nth-child(3) {
-    animation-delay: 0.4s;
-  }
-
-  .premium-card {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 1rem;
-    padding: 1rem;
-    transition: all 200ms ease-out;
-  }
-
-  .premium-card:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.1);
-    transform: translateY(-1px);
   }
 
   .confidence-bar {
@@ -415,11 +347,20 @@
   }
 }
 
-@keyframes typingBounce {
-  0%, 60%, 100% {
-    transform: translateY(0);
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
   }
-  30% {
-    transform: translateY(-4px);
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulseSoft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }

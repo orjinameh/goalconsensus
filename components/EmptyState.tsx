@@ -1,18 +1,24 @@
 "use client";
 
-import { Shield, Search } from "lucide-react";
+import { Shield, Search, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
   title: string;
   description: string;
-  icon?: "shield" | "search";
+  icon?: "shield" | "search" | "alert";
   action?: {
     label: string;
     onClick: () => void;
   };
   className?: string;
 }
+
+const iconMap = {
+  shield: Shield,
+  search: Search,
+  alert: AlertCircle,
+};
 
 export function EmptyState({
   title,
@@ -21,6 +27,8 @@ export function EmptyState({
   action,
   className,
 }: EmptyStateProps) {
+  const Icon = iconMap[icon];
+
   return (
     <div
       className={cn(
@@ -29,16 +37,12 @@ export function EmptyState({
       )}
     >
       <div className="w-12 h-12 rounded-2xl bg-surface-3 border border-border-subtle flex items-center justify-center mb-4">
-        {icon === "shield" ? (
-          <Shield size={20} className="text-text-muted" />
-        ) : (
-          <Search size={20} className="text-text-muted" />
-        )}
+        <Icon size={20} className="text-text-muted" />
       </div>
-      <h3 className="text-sm font-semibold text-text-primary mb-1">
+      <h3 className="text-sm font-semibold text-text-primary mb-1.5">
         {title}
       </h3>
-      <p className="text-xs text-text-tertiary max-w-sm leading-relaxed mb-4">
+      <p className="text-xs text-text-tertiary max-w-sm leading-relaxed mb-5">
         {description}
       </p>
       {action && (
