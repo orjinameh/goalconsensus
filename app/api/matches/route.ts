@@ -35,10 +35,10 @@ export async function GET() {
     }
 
     const fastAgents = agents.filter(
-      (a) => a.agentId !== "llm-reasoning"
+      (a) => a.id !== "llm-reasoning"
     );
     const llmAgent = agents.find(
-      (a) => a.agentId === "llm-reasoning"
+      (a) => a.id === "llm-reasoning"
     );
 
     const enriched: EnrichedMatch[] = [];
