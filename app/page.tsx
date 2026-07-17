@@ -157,7 +157,7 @@ export default function Home() {
               ...s,
               status: "completed",
               latencyMs: 10,
-              detail: `BFT consensus: ${res.consensus.agreement}/${res.consensus.totalAgents} agents agree`,
+              detail: `Ensemble vote: ${res.consensus.agreement}/${res.consensus.totalAgents} agents agree`,
             };
           if (s.id === "settlement")
             return {
@@ -203,9 +203,15 @@ export default function Home() {
         <Header paymentCount={paymentCount} />
         <main className="px-5 py-6">
           <ConsensusDisplay
-            result={result.consensus}
-            providerHealth={result.providerHealth}
-            onBack={goToLanding}
+            agreement={result.consensus.agreement}
+            totalAgents={result.consensus.totalAgents}
+            confidence={result.consensus.confidence}
+            prediction={result.consensus.finalPrediction}
+            minorityOpinion={result.consensus.minorityOpinion}
+            reasoning={result.consensus.reasoning}
+            decision={result.consensus.settlementDecision}
+            agents={result.consensus.agents}
+            matchStatus={result.consensus.canonicalState?.status}
           />
         </main>
       </div>
@@ -254,7 +260,7 @@ export default function Home() {
           </p>
           <p className="text-sm text-text-tertiary max-w-xl mx-auto leading-relaxed mb-10">
             Predict and verify football match results across every competition using
-            3 independent AI agents. Byzantine consensus. Trustless verification.
+            AI ensemble voting and BFT provider verification. Trustless, multi-agent intelligence.
           </p>
 
           <div className="max-w-xl mx-auto">
@@ -290,7 +296,7 @@ export default function Home() {
               { icon: <Zap size={10} />, label: "2 Providers" },
               { icon: <GitBranch size={10} />, label: "Canonical State" },
               { icon: <Shield size={10} />, label: "3 AI Agents" },
-              { icon: <Lock size={10} />, label: "BFT Consensus" },
+              { icon: <Lock size={10} />, label: "Ensemble Vote" },
             ].map((item, i) => (
               <div key={item.label} className="flex items-center gap-2 shrink-0">
                 {i > 0 && <span className="text-text-muted">&rarr;</span>}

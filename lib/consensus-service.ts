@@ -8,6 +8,8 @@ import {
 } from "./providers";
 import { agents, type VerificationAgent } from "./agents";
 import { computeAgentConsensus, type ConsensusResult } from "./consensus";
+import { computePrediction, type PredictionResult } from "./prediction-engine";
+import { verifyProviderScores, type VerificationResult } from "./verification-engine";
 import type { CanonicalMatchState, AgentOutput } from "./agents/types";
 import { SingleFlight } from "./llm/single-flight";
 
@@ -16,6 +18,8 @@ const consensusSingleFlight = new SingleFlight();
 
 interface EnrichedMatch extends MatchResult {
   consensus?: ConsensusResult;
+  prediction?: PredictionResult;
+  verification?: VerificationResult;
   llmPending: boolean;
 }
 
@@ -27,6 +31,8 @@ interface MatchesResponse {
 
 interface ConsensusResponse {
   consensus: ConsensusResult;
+  prediction?: PredictionResult;
+  verification?: VerificationResult;
   agentOutputs: AgentOutput[];
   providerHealth: ProviderHealth[];
 }
@@ -34,6 +40,7 @@ interface ConsensusResponse {
 interface PredictResponse {
   canonicalState: CanonicalMatchState | null;
   agentOutputs: AgentOutput[];
+  prediction?: PredictionResult;
 }
 
 function dedupeMatches(matches: MatchResult[]): MatchResult[] {
@@ -91,11 +98,35 @@ export async function getMatches(): Promise<MatchesResponse> {
         fastAgents.map((agent) => agent.verify(canonicalState))
       );
 
-      enriched.push({
-        ...first,
-        consensus: computeAgentConsensus(fastResults, canonicalState),
-        llmPending: false,
-      });
+      if (first.status === "SCHEDULED") {
+        enriched.push({
+          ...first,
+          prediction: computePrediction(fastResults, canonicalState),
+          llmPending: false,
+        });
+      } else if (first.status === "FINISHED") {
+        const providerScores = responding.map((pr) => ({
+          providerId: pr.health.providerId,
+          providerName: pr.health.providerId,
+          homeTeam: first.homeTeam,
+          awayTeam: first.awayTeam,
+          homeScore: first.homeScore,
+          awayScore: first.awayScore,
+          fetchedAt: new Date().toISOString(),
+          latencyMs: 0,
+        }));
+        enriched.push({
+          ...first,
+          verification: verifyProviderScores(providerScores, canonicalState),
+          llmPending: false,
+        });
+      } else {
+        enriched.push({
+          ...first,
+          consensus: computeAgentConsensus(fastResults, canonicalState),
+          llmPending: false,
+        });
+      }
     }
 
     return {
@@ -144,8 +175,37 @@ export async function getConsensus(
       agents.map((agent) => agent.verify(canonicalState))
     );
 
-    const consensus = computeAgentConsensus(agentOutputs, canonicalState);
+    if (first.status === "SCHEDULED") {
+      const prediction = computePrediction(agentOutputs, canonicalState);
+      return {
+        consensus: computeAgentConsensus(agentOutputs, canonicalState),
+        prediction,
+        agentOutputs,
+        providerHealth: providerResults.map((pr) => pr.health),
+      };
+    }
 
+    if (first.status === "FINISHED") {
+      const providerScores = responding.map((pr) => ({
+        providerId: pr.health.providerId,
+        providerName: pr.health.providerId,
+        homeTeam: first.homeTeam,
+        awayTeam: first.awayTeam,
+        homeScore: first.homeScore,
+        awayScore: first.awayScore,
+        fetchedAt: new Date().toISOString(),
+        latencyMs: 0,
+      }));
+      const verification = verifyProviderScores(providerScores, canonicalState);
+      return {
+        consensus: computeAgentConsensus(agentOutputs, canonicalState),
+        verification,
+        agentOutputs,
+        providerHealth: providerResults.map((pr) => pr.health),
+      };
+    }
+
+    const consensus = computeAgentConsensus(agentOutputs, canonicalState);
     return {
       consensus,
       agentOutputs,
@@ -168,7 +228,9 @@ export async function getPrediction(
     agents.map((agent) => agent.verify(canonicalState))
   );
 
-  return { canonicalState, agentOutputs };
+  const prediction = computePrediction(agentOutputs, canonicalState);
+
+  return { canonicalState, agentOutputs, prediction };
 }
 
 export async function verifySettlement(
@@ -177,6 +239,7 @@ export async function verifySettlement(
   safeForSettlement: boolean;
   match: string;
   consensus: ConsensusResult;
+  verification?: VerificationResult;
   agentOutputs: AgentOutput[];
   providerHealth: ProviderHealth[];
 }> {
@@ -226,10 +289,23 @@ export async function verifySettlement(
 
   const consensus = computeAgentConsensus(agentOutputs, canonicalState);
 
+  const providerScores = responding.map((pr) => ({
+    providerId: pr.health.providerId,
+    providerName: pr.health.providerId,
+    homeTeam: first.homeTeam,
+    awayTeam: first.awayTeam,
+    homeScore: first.homeScore,
+    awayScore: first.awayScore,
+    fetchedAt: new Date().toISOString(),
+    latencyMs: 0,
+  }));
+  const verification = verifyProviderScores(providerScores, canonicalState);
+
   return {
     safeForSettlement: consensus.settlementDecision === "SETTLE",
     match: `${canonicalState.homeTeam} vs ${canonicalState.awayTeam}`,
     consensus,
+    verification,
     agentOutputs,
     providerHealth: providerResults.map((pr) => pr.health),
   };

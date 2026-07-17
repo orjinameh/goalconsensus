@@ -42,6 +42,32 @@ export interface CanonicalMatchState {
   rawResults: MatchResult[];
 }
 
+export interface PredictionResult {
+  finalPrediction: {
+    winner: string;
+    homeScore: number | null;
+    awayScore: number | null;
+  };
+  agreement: number;
+  totalAgents: number;
+  confidence: number;
+  minorityOpinion: AgentOutput | null;
+  evidence: AgentEvidence[];
+  reasoning: string;
+  predictionDecision:
+    | "UNANIMOUS"
+    | "STRONG_MAJORITY"
+    | "MAJORITY"
+    | "SPLIT"
+    | "INSUFFICIENT_DATA"
+    | "UNSUPPORTED_SPORT"
+    | "COMPLETED";
+  agents: AgentOutput[];
+  canonicalState: CanonicalMatchState;
+  upsetProbability: number;
+  riskRating: "low" | "medium" | "high";
+}
+
 export interface ConsensusResult {
   finalPrediction: {
     winner: string;

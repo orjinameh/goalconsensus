@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "GoalConsensus — Multi-Agent Football Intelligence Platform",
   description:
-    "Predict and verify football match results across every competition using 3 independent AI agents. Byzantine-inspired consensus. Trustless verification. MCP integration.",
+    "Predict and verify football match results across every competition using AI ensemble voting and BFT provider verification. Trustless, multi-agent intelligence. MCP integration.",
   keywords: [
     "football",
     "prediction",
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "GoalConsensus — Multi-Agent Football Intelligence Platform",
     description:
-      "Predict and verify football match results using 3 independent AI agents. Byzantine-inspired consensus across all competitions.",
+      "Predict and verify football match results using AI ensemble voting and BFT provider verification across all competitions.",
     url: "https://goalconsensus.onrender.com",
     siteName: "GoalConsensus",
     type: "website",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "GoalConsensus — Football Intelligence Platform",
     description:
-      "Predict and verify football match results using independent AI agents. Byzantine consensus. MCP integration.",
+      "Predict and verify football match results using AI ensemble voting and BFT verification. MCP integration.",
   },
   robots: {
     index: true,
