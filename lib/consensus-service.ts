@@ -4,17 +4,19 @@ import {
   buildCanonicalState,
   type MatchResult,
   type ProviderHealth,
-  type ProviderResult,
 } from "./providers";
-import { agents, type VerificationAgent } from "./agents";
+import { specialistAgents, agents } from "./agents";
 import { computeAgentConsensus, type ConsensusResult } from "./consensus";
 import { computePrediction, type PredictionResult } from "./prediction-engine";
 import { verifyProviderScores, type VerificationResult } from "./verification-engine";
-import type { CanonicalMatchState, AgentOutput } from "./agents/types";
+import { runDebate } from "./debate-engine";
+import { generatePremiumReport, getReportCatalog } from "./premium-reports";
+import type { CanonicalMatchState, AgentOutput, DebateMessage, AIConsensus, PremiumReport, PremiumReportType } from "./agents/types";
 import { SingleFlight } from "./llm/single-flight";
 
 const matchSingleFlight = new SingleFlight();
 const consensusSingleFlight = new SingleFlight();
+const specialistSingleFlight = new SingleFlight();
 
 interface EnrichedMatch extends MatchResult {
   consensus?: ConsensusResult;
@@ -29,10 +31,16 @@ interface MatchesResponse {
   fetchedAt: string;
 }
 
+interface SpecialistResponse {
+  agentOutputs: AgentOutput[];
+  canonicalState: CanonicalMatchState | null;
+}
+
 interface ConsensusResponse {
   consensus: ConsensusResult;
   prediction?: PredictionResult;
   verification?: VerificationResult;
+  debate?: { messages: DebateMessage[]; consensus: AIConsensus };
   agentOutputs: AgentOutput[];
   providerHealth: ProviderHealth[];
 }
@@ -41,6 +49,14 @@ interface PredictResponse {
   canonicalState: CanonicalMatchState | null;
   agentOutputs: AgentOutput[];
   prediction?: PredictionResult;
+}
+
+interface IntelligenceResponse {
+  canonicalState: CanonicalMatchState | null;
+  specialistOutputs: AgentOutput[];
+  debate: { messages: DebateMessage[]; consensus: AIConsensus };
+  prediction?: PredictionResult;
+  consensus?: ConsensusResult;
 }
 
 function dedupeMatches(matches: MatchResult[]): MatchResult[] {
@@ -137,6 +153,60 @@ export async function getMatches(): Promise<MatchesResponse> {
   });
 }
 
+export async function getSpecialists(
+  homeTeam: string,
+  awayTeam: string
+): Promise<SpecialistResponse> {
+  const key = `specialists:${matchKey(homeTeam, awayTeam)}`;
+
+  return specialistSingleFlight.dedupe(key, async () => {
+    const canonicalState = await buildCanonicalState(homeTeam, awayTeam);
+
+    if (!canonicalState) {
+      return { agentOutputs: [], canonicalState: null };
+    }
+
+    const specialistResults = await Promise.all(
+      specialistAgents.map((agent) => agent.verify(canonicalState))
+    );
+
+    return { agentOutputs: specialistResults, canonicalState };
+  });
+}
+
+export async function getIntelligence(
+  homeTeam: string,
+  awayTeam: string
+): Promise<IntelligenceResponse> {
+  const key = `intelligence:${matchKey(homeTeam, awayTeam)}`;
+
+  return specialistSingleFlight.dedupe(key, async () => {
+    const canonicalState = await buildCanonicalState(homeTeam, awayTeam);
+
+    if (!canonicalState) {
+      return {
+        canonicalState: null,
+        specialistOutputs: [],
+        debate: { messages: [], consensus: { winner: "Unknown", confidence: 0, agreement: 0, totalAgents: 0, messages: [], minorityOpinion: null } },
+      };
+    }
+
+    const specialistResults = await Promise.all(
+      specialistAgents.map((agent) => agent.verify(canonicalState))
+    );
+
+    const debate = runDebate(specialistResults, canonicalState);
+    const prediction = computePrediction(specialistResults, canonicalState);
+
+    return {
+      canonicalState,
+      specialistOutputs: specialistResults,
+      debate,
+      prediction,
+    };
+  });
+}
+
 export async function getConsensus(
   homeTeam: string,
   awayTeam: string
@@ -175,11 +245,14 @@ export async function getConsensus(
       agents.map((agent) => agent.verify(canonicalState))
     );
 
+    const debate = runDebate(agentOutputs, canonicalState);
+
     if (first.status === "SCHEDULED") {
       const prediction = computePrediction(agentOutputs, canonicalState);
       return {
         consensus: computeAgentConsensus(agentOutputs, canonicalState),
         prediction,
+        debate,
         agentOutputs,
         providerHealth: providerResults.map((pr) => pr.health),
       };
@@ -200,6 +273,7 @@ export async function getConsensus(
       return {
         consensus: computeAgentConsensus(agentOutputs, canonicalState),
         verification,
+        debate,
         agentOutputs,
         providerHealth: providerResults.map((pr) => pr.health),
       };
@@ -208,6 +282,7 @@ export async function getConsensus(
     const consensus = computeAgentConsensus(agentOutputs, canonicalState);
     return {
       consensus,
+      debate,
       agentOutputs,
       providerHealth: providerResults.map((pr) => pr.health),
     };
@@ -231,6 +306,25 @@ export async function getPrediction(
   const prediction = computePrediction(agentOutputs, canonicalState);
 
   return { canonicalState, agentOutputs, prediction };
+}
+
+export async function getPremiumReport(
+  type: PremiumReportType,
+  homeTeam: string,
+  awayTeam: string
+): Promise<PremiumReport | null> {
+  const canonicalState = await buildCanonicalState(homeTeam, awayTeam);
+  if (!canonicalState) return null;
+
+  const specialistResults = await Promise.all(
+    specialistAgents.map((agent) => agent.verify(canonicalState))
+  );
+
+  return generatePremiumReport(type, canonicalState, []);
+}
+
+export function getReportCatalogInfo() {
+  return getReportCatalog();
 }
 
 export async function verifySettlement(

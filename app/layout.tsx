@@ -2,25 +2,27 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GoalConsensus — Multi-Agent Football Intelligence Platform",
+  title: "GoalConsensus — The World Cup Intelligence Terminal",
   description:
-    "Predict and verify football match results across every competition using AI ensemble voting and BFT provider verification. Trustless, multi-agent intelligence. MCP integration.",
+    "AI-powered intelligence for fans, developers and autonomous agents. Five specialist AI agents analyze every match in real-time.",
   keywords: [
     "football",
+    "world cup",
+    "AI intelligence",
     "prediction",
     "verification",
     "consensus",
-    "AI",
-    "prediction markets",
-    "Injective",
-    "x402",
     "MCP",
-    "settlement",
+    "x402",
+    "CCTP",
+    "Injective",
+    "agent skills",
+    "blockchain",
   ],
   openGraph: {
-    title: "GoalConsensus — Multi-Agent Football Intelligence Platform",
+    title: "GoalConsensus — The World Cup Intelligence Terminal",
     description:
-      "Predict and verify football match results using AI ensemble voting and BFT provider verification across all competitions.",
+      "AI-powered intelligence for fans, developers and autonomous agents. Five specialist AI agents analyze every match.",
     url: "https://goalconsensus.onrender.com",
     siteName: "GoalConsensus",
     type: "website",
@@ -28,9 +30,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "GoalConsensus — Football Intelligence Platform",
+    title: "GoalConsensus — World Cup Intelligence Terminal",
     description:
-      "Predict and verify football match results using AI ensemble voting and BFT verification. MCP integration.",
+      "AI-powered football intelligence. Five specialist agents. Live debate. Premium reports. Built on Injective.",
   },
   robots: {
     index: true,

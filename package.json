@@ -1,8 +1,8 @@
 {
   "name": "goalconsensus",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "private": true,
-  "description": "Multi-Agent Football Intelligence Platform — Prediction, Verification, and Consensus for prediction markets",
+  "description": "The World Cup Intelligence Terminal — Five AI agents, live debate, premium reports, prediction markets. Built on Injective.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

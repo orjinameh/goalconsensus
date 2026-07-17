@@ -1,176 +1,175 @@
-# GoalConsensus
+# GoalConsensus — The World Cup Intelligence Terminal
 
-**Multi-Agent Football Intelligence Platform**
+**Five AI agents. Live debate. Premium reports. Predictions markets. Built on Injective.**
 
-A full-stack football-only application that predicts upcoming match results using AI ensemble voting and verifies finished results through BFT provider consensus — exposing everything via an MCP Server with x402 micropayments on Injective.
+A full-stack multi-agent AI intelligence platform that analyzes every match in the 2026 FIFA World Cup using five specialist agents, live AI debate, premium deep-dive reports, and a prediction market with cross-chain USDC settlement.
 
-## Two-Engine Architecture
+---
 
-```
-                    ┌─────────────────────────┐
-                    │   Match Status Router     │
-                    └──────┬──────────┬────────┘
-                           │          │
-              SCHEDULED    │          │  FINISHED
-                           ▼          ▼
-              ┌────────────────┐  ┌─────────────────────┐
-              │ Prediction     │  │ Verification Engine  │
-              │ Engine         │  │ (BFT Provider)       │
-              │ (Ensemble)     │  │                      │
-              └───────┬────────┘  └──────────┬───────────┘
-                      │                      │
-        ┌─────────────┼──────────┐    ┌──────┼────────────┐
-        ▼             ▼          ▼    ▼      ▼            ▼
-   Statistical    LLM       Rules  API-FB  SportMonks  Football-Data
-   (Poisson)    (Groq)    (Check)   │         │            │
-        │             │          │    └──────┬──┘            │
-        └─────┬───────┘          │         │               │
-              │                  │    Provider Score     Provider Score
-              ▼                  │         │               │
-     Weighted Ensemble           │         └───────┬───────┘
-     Voting                      │                 │
-              │                  │         Majority Agreement
-              ▼                  │                 │
-     AI Ensemble Prediction      ▼                 ▼
-     (upset prob, risk)    BFT Verification   Verified/Disputed
-```
+## What It Does
 
-### Prediction Engine (Scheduled Matches)
+### Five Specialist Agents
 
-Uses **weighted ensemble voting** (NOT BFT) to predict upcoming match results:
+Each agent is an autonomous domain expert:
 
-- Each of 3 agents votes on winner and score
-- Votes weighted by agent confidence
-- Ensemble picks majority score, then majority winner
-- Returns: ensemble confidence, agreement %, minority opinion, upset probability, risk rating
-
-| Decision | Condition |
-|---|---|
-| `UNANIMOUS` | All 3 agents agree on score |
-| `STRONG_MAJORITY` | ≥67% agents agree |
-| `MAJORITY` | ≥2 agents agree |
-| `SPLIT` | No clear majority |
-| `COMPLETED` | Match already finished |
-| `INSUFFICIENT_DATA` | No agent outputs |
-
-### Verification Engine (Finished Matches)
-
-Uses **BFT provider consensus** to verify finished match results:
-
-- Compares scores across API-Football, SportMonks, and Football-Data
-- Requires ≥67% provider agreement on score
-- Verifies canonical state matches majority provider score
-- Returns: verified/disputed, provider agreement, disputed providers
-
-| Decision | Condition |
-|---|---|
-| `VERIFIED` | ≥67% providers agree + canonical state confirmed |
-| `DISPUTED` | Providers report different scores |
-| `INSUFFICIENT_DATA` | <2 providers available |
-
-### Live Matches
-
-Live matches use the legacy BFT agent consensus (Statistical + LLM + Rules agents) for real-time monitoring.
-
-## Data Layer
-
-Two independent football-only providers establish the **canonical match state**:
-
-| Provider | Source | API Key |
+| Agent | Domain | Approach |
 |---|---|---|
-| `football-data` | football-data.org | `FOOTBALL_DATA_API_KEY` |
-| `thesportsdb` | thesportsdb.com | Free (no key) |
+| **Tactical Analyst** | Formation analysis, pressing triggers, set-piece vulnerability | ELO-weighted team ratings, home advantage factor (+0.35 xG), historical matchup data |
+| **Statistical Agent** | Goal prediction, win probabilities, expected goals | Poisson regression, Monte Carlo simulation (10,000 iterations), entropy-based confidence |
+| **Market Analyst** | Odds analysis, value detection, line movement | Poisson-derived odds vs bookmaker odds, value identification, market consensus |
+| **Injury Analyst** | Squad fitness, recovery timelines, depth assessment | Injury database matching, ELO-adjusted squad strength, position coverage analysis |
+| **News Analyst** | Form analysis, context, motivation, travel factors | Recent form calculation (last 5 matches), home/away performance, rest days |
 
-Both providers are filtered to return only football competitions. Non-football events are rejected.
+### Live AI Debate
 
-If fewer than 2 providers respond, the canonical state cannot be established and the system returns `INSUFFICIENT_DATA`.
+After all five agents produce their individual analyses, a structured debate runs:
 
-## Analysis Layer
+1. **Round 1** — Each agent presents their stance (agree/disagree/neutral) with the tactical analyst's prediction
+2. **Round 2** — Agents respond to each other's arguments
+3. **Consensus** — The system derives a winner, confidence score, agreement level, and minority opinion
 
-Three independent verification agents analyze the canonical state:
+Every message in the debate is visible to the user with agent name, stance badge, and reasoning.
 
-#### 1. Statistical Agent
-- Poisson regression model for football goal prediction
-- Expected goals (xG) calculation based on team strength
-- Home advantage factor (+0.35 xG)
-- Monte Carlo simulation (10,000 iterations) for win/draw/loss probabilities
-- Entropy-based confidence calculation from model certainty
-- Produces predicted score and confidence
+### Premium Reports
 
-#### 2. LLM Reasoning Agent
-- Uses Gemini (primary), Groq (fallback), OpenRouter (fallback)
-- Multi-provider LLM chain with automatic failover
-- Reasons about form, venue advantage, historical matchups, squad depth, tactical matchup
-- Produces structured JSON with prediction, confidence, and key factors
-- Gracefully falls back when all APIs unavailable
-- Consensus continues using remaining agents when LLM fails
+Deep-dive intelligence reports gated behind x402 micropayments:
 
-#### 3. Deterministic Rules Agent
-- Provider agreement validation (2+ providers required)
-- Match completion verification
-- Timestamp validation (within -24h to +48h)
-- Data consistency checks (plausible scores)
-- Provider health verification
+| Report | Price | Content |
+|---|---|---|
+| Full Tactical Breakdown | 0.005 USDC | 3,000+ word formation analysis, pressing triggers, key battles |
+| Historical Deep Dive | 0.003 USDC | Head-to-head records, venue-specific trends, rivalry context |
+| Player Impact Report | 0.002 USDC | Key player profiles, form analysis, tactical roles, impact scores |
+| Market Intelligence | 0.004 USDC | Odds comparison, value opportunities, market sentiment, line movement |
+| Risk Assessment | 0.01 USDC | Injury risks, fatigue factors, discipline concerns, squad depth |
 
-Each agent returns:
-```typescript
-{
-  prediction: { winner, homeScore, awayScore },
-  confidence: number,       // 0-100
-  explanation: string,
-  evidence: AgentEvidence[]
-}
+### Prediction Markets
+
+Stake on match outcomes with cross-chain USDC settlement:
+
+- View dynamic odds based on AI agent consensus
+- Place stakes (win/draw/loss) with confidence-weighted payouts
+- Markets resolve automatically when verified results are confirmed
+- CCTP bridge supports cross-chain USDC transfers (Ethereum, Arbitrum, Base)
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     The Intelligence Terminal                │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐                │
+│   │ Tactical  │  │Statistical│  │ Market   │  ... (5)      │
+│   │ Analyst   │  │  Agent   │  │ Analyst  │                │
+│   └─────┬─────┘  └─────┬────┘  └─────┬────┘               │
+│         │              │              │                     │
+│         ▼              ▼              ▼                     │
+│   ┌─────────────────────────────────────────────┐           │
+│   │            AI Debate Engine                  │           │
+│   │  (Round 1 → Round 2 → Consensus)            │           │
+│   └──────────────────┬──────────────────────────┘           │
+│                      │                                       │
+│          ┌───────────┼────────────┐                          │
+│          ▼           ▼            ▼                          │
+│   ┌────────────┐ ┌─────────┐ ┌──────────┐                  │
+│   │ Prediction  │ │Premium  │ │Prediction│                  │
+│   │  Engine     │ │Reports  │ │ Markets  │                  │
+│   │(Ensemble)   │ │(x402)   │ │(CCTP)    │                  │
+│   └──────┬─────┘ └────┬────┘ └────┬─────┘                  │
+│          │            │            │                         │
+│          ▼            ▼            ▼                         │
+│   ┌─────────────────────────────────────────────┐           │
+│   │              MCP Server (15 tools)           │           │
+│   │         x402 micropayment receipts           │           │
+│   └─────────────────────────────────────────────┘           │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### LLM Provider Chain
+### Data Pipeline
 
-When the primary LLM fails:
-- Real API error is logged on the server only
-- System automatically falls back to next provider in chain: Gemini → Groq → OpenRouter → Heuristic
-- Circuit breaker prevents repeated failures to same provider
-- User sees clean fallback messages
-- Application continues functioning normally
+1. **Canonical State** — Two football-only providers (football-data.org, thesportsdb.com) establish the source of truth
+2. **Specialist Analysis** — Five agents independently analyze the match using team ratings, Poisson models, injury data, and news context
+3. **AI Debate** — Agents debate and form consensus with visible agreement/disagreement
+4. **Intelligence Delivery** — Results served via MCP Server, REST API, or UI
 
-## The Problem
-
-Prediction markets settle bets based on match results from a single data source. If that source is wrong or manipulated, bets can be settled incorrectly. GoalConsensus solves this by:
-1. Requiring agreement from multiple independent football data providers (BFT verification)
-2. Running three independent AI agents with ensemble voting for predictions
-3. Automatic mode switching based on match status
+---
 
 ## Injective Technology Integration
 
-| Technology | Usage |
-|---|---|
-| **MCP Server** | Tool transport — 7 tools via `@modelcontextprotocol/sdk` |
-| **x402** | Per-query micropayments — 0.001 USDC per API/MCP call |
-| **CCTP** | Cross-chain USDC settlement for prediction market payouts |
-| **Agent Skills** | 7 MCP tools with full agent reasoning and evidence |
+| Technology | Implementation | Purpose |
+|---|---|---|
+| **MCP Server** | `@modelcontextprotocol/sdk` with StdioServerTransport | Agent tool protocol — 15 tools for match intelligence |
+| **x402** | Payment receipts per API/MCP call (0.001 USDC) | Micropayments for premium reports and market access |
+| **CCTP** | Cross-chain USDC transfers via Axelar | Prediction market settlement across EVM chains |
+| **Agent Skills** | Structured MCP tool definitions with reasoning | Full agent reasoning, evidence, and provider health in every response |
 
-## Installation
+### MCP Tools (15)
+
+| Tool | Category | Description |
+|---|---|---|
+| `analyze_match` | Intelligence | Full specialist analysis with all 5 agents |
+| `compare_teams` | Intelligence | Head-to-head comparison with specialist breakdown |
+| `historical_analysis` | Intelligence | Historical matchup and venue data |
+| `predict_match` | Prediction | AI ensemble prediction with upset probability |
+| `market_analysis` | Specialist | Odds analysis and value detection |
+| `player_report` | Specialist | Player impact and form analysis |
+| `injury_report` | Specialist | Squad fitness and injury assessment |
+| `premium_report` | Premium | Deep-dive report (x402 payment required) |
+| `verify_result` | Verification | BFT provider verification |
+| `verify_settlement` | Verification | Settlement safety check |
+| `get_provider_consensus` | Verification | Cross-provider score comparison |
+| `consensus` | Legacy | BFT agent consensus for live matches |
+| `get_live_matches` | General | All matches with mode-aware status |
+| `get_report_catalog` | Premium | Available report types and pricing |
+| `get_qualification_scenarios` | Intelligence | World Cup group stage scenarios |
+
+---
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/matches` | GET | Football matches with predictions/verification |
+| `/api/consensus` | POST | Full BFT consensus (`{ homeTeam, awayTeam }`) |
+| `/api/predict` | POST | Ensemble prediction (`{ homeTeam, awayTeam }`) |
+| `/api/intelligence` | POST | Full specialist analysis (`{ homeTeam, awayTeam }`) |
+| `/api/reports/catalog` | GET | Premium report types and pricing |
+| `/api/reports/generate` | POST | Generate premium report |
+| `/api/market` | GET | Prediction market odds for all matches |
+| `/api/market/stake` | POST | Place a stake on match outcome |
+| `/api/market/resolve` | POST | Resolve a prediction market |
+
+---
+
+## Setup
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/orjinameh/goalconsensus.git
 cd goalconsensus
 npm install
 
 cp .env.example .env
-# Configure:
+# Required:
 #   FOOTBALL_DATA_API_KEY — https://www.football-data.org/client/register
-#   GEMINI_API_KEY — optional, primary LLM provider
-#   GROQ_API_KEY — optional, fallback LLM provider
-#   OPENROUTER_API_KEY — optional, third fallback LLM provider
+# Optional (LLM providers, in priority order):
+#   GEMINI_API_KEY — Primary LLM
+#   GROQ_API_KEY — Fallback LLM
+#   OPENROUTER_API_KEY — Third fallback
 ```
 
 ## Running
 
 ```bash
-npm run dev      # Next.js app at http://localhost:3000
+npm run dev      # Next.js app — http://localhost:3000
 npm run mcp      # MCP Server (stdio)
-npm test         # Unit tests (24 test cases)
+npm test         # 24 unit tests
+npm run build    # Production build
 ```
 
-### Claude Desktop
+## Claude Desktop Integration
 
 ```json
 {
@@ -188,109 +187,95 @@ npm test         # Unit tests (24 test cases)
 }
 ```
 
-## MCP Tools
-
-### Prediction Tools (Scheduled Matches)
-
-| Tool | Description | Input |
-|---|---|---|
-| `predict_match` | AI ensemble prediction with upset probability and risk rating | `homeTeam`, `awayTeam` |
-| `prediction_reasoning` | Detailed ensemble reasoning with minority opinion | `homeTeam`, `awayTeam` |
-
-### Verification Tools (Finished Matches)
-
-| Tool | Description | Input |
-|---|---|---|
-| `verify_result` | BFT provider verification with settlement decision | `homeTeam`, `awayTeam` |
-| `verify_settlement` | Check if result is safe for on-chain settlement | `query` |
-| `get_provider_consensus` | Provider-level score comparison across data sources | `homeTeam`, `awayTeam` |
-
-### General Tools
-
-| Tool | Description | Input |
-|---|---|---|
-| `get_live_matches` | All matches with mode-aware status (prediction/verification/live) | None |
-| `team_analysis` | Dynamic ELO rating, attack/defense strength, recent form | `team` |
-
-All tools return agent reasoning, evidence, provider health, and x402 payment receipts.
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/matches` | GET | Football matches with predictions (scheduled) or verification (finished) |
-| `/api/consensus` | POST | Full consensus: `{ homeTeam, awayTeam }` — auto-routes by match status |
-| `/api/predict` | POST | Ensemble prediction: `{ homeTeam, awayTeam }` |
-
-## Test Coverage
-
-24 unit tests covering:
-- Football matches (SETTLE, DO_NOT_SETTLE, PENDING)
-- Unsupported sports (rugby, basketball, baseball)
-- Provider timeout / insufficient data
-- Provider disagreement
-- One provider available
-- Two providers available
-- Three providers available
-- LLM unavailable (zero confidence agent)
-- All agents zero confidence
-- Successful consensus
-- Evidence aggregation
-- Reasoning text generation
-- Canonical state propagation
-- Confidence calculation
-- Minority opinion handling
+---
 
 ## Tech Stack
 
 - **Next.js 14** — App Router, API Routes, ISR caching
 - **TypeScript** — Full type safety across all layers
-- **Tailwind CSS** — Dark theme, functional design
-- **@modelcontextprotocol/sdk** — MCP Server with StdioServerTransport
+- **Tailwind CSS** — Dark theme, Bloomberg/Perplexity-inspired design
+- **@modelcontextprotocol/sdk** — MCP Server with 15 tools
 - **Gemini / Groq / OpenRouter** — Multi-provider LLM chain with circuit breaker
 - **Axios** — Parallel provider calls with retry and timeout
 - **lucide-react** — Icons
-- **Node.js test runner** — Built-in unit testing
+- **Node.js test runner** — 24 unit tests
+
+---
+
+## Test Coverage
+
+24 tests covering:
+- Football match consensus (SETTLE, DO_NOT_SETTLE, PENDING)
+- Unsupported sports rejection
+- Provider timeout and insufficient data
+- Provider disagreement handling
+- LLM unavailability and zero-confidence agents
+- Evidence aggregation across agents
+- Confidence calculation and minority opinion
+- Canonical state propagation
+
+---
 
 ## Project Structure
 
 ```
 goalconsensus/
 ├── app/
-│   ├── page.tsx                  # Dashboard with mode-aware UI
-│   ├── layout.tsx                # Root layout
-│   ├── globals.css               # Tailwind base
+│   ├── page.tsx                      # World Cup Intelligence Terminal homepage
+│   ├── layout.tsx                    # Root layout with metadata
+│   ├── globals.css                   # Design system + animations
 │   └── api/
-│       ├── matches/route.ts      # GET — matches with predictions/verification
-│       ├── predict/route.ts      # POST — ensemble prediction
-│       └── consensus/route.ts    # POST — full consensus by match status
+│       ├── matches/route.ts          # GET — matches with predictions/verification
+│       ├── predict/route.ts          # POST — ensemble prediction
+│       ├── consensus/route.ts        # POST — full BFT consensus
+│       ├── intelligence/route.ts     # POST — specialist agent analysis
+│       ├── reports/
+│       │   ├── catalog/route.ts      # GET — premium report catalog
+│       │   └── generate/route.ts     # POST — generate premium report
+│       └── market/
+│           ├── route.ts              # GET — prediction market odds
+│           ├── stake/route.ts        # POST — place a stake
+│           └── resolve/route.ts      # POST — resolve market
 ├── lib/
-│   ├── providers.ts              # Football data providers + canonical state builder
-│   ├── prediction-engine.ts      # Weighted ensemble voting (scheduled matches)
-│   ├── verification-engine.ts    # BFT provider verification (finished matches)
-│   ├── consensus.ts              # Legacy BFT agent consensus (live matches)
-│   ├── consensus-service.ts      # Routes by match status: predict/verify/live
-│   ├── team-ratings.ts           # Dynamic ELO + attack/defense strength
-│   ├── llm/
-│   │   ├── index.ts              # Gemini → Groq → OpenRouter chain
-│   │   ├── single-flight.ts      # Request deduplication
-│   │   └── circuit-breaker.ts    # Provider failure isolation
 │   ├── agents/
-│   │   ├── types.ts              # Agent interfaces, PredictionResult, ConsensusResult
-│   │   ├── index.ts              # Agent registry
-│   │   ├── statistical-agent.ts  # Poisson model + xG + Monte Carlo
-│   │   ├── llm-reasoning-agent.ts # Multi-LLM reasoning (graceful fallback)
+│   │   ├── types.ts                  # 15+ types: specialist agents, debate, reports, markets
+│   │   ├── index.ts                  # Agent registry (legacy + 5 specialists)
+│   │   ├── tactical-analyst.ts       # Specialist — formation, pressing, set pieces
+│   │   ├── statistical-agent.ts      # Specialist — Poisson, Monte Carlo, xG
+│   │   ├── market-analyst.ts         # Specialist — odds, value, line movement
+│   │   ├── injury-analyst.ts         # Specialist — fitness, recovery, depth
+│   │   ├── news-analyst.ts           # Specialist — form, context, motivation
+│   │   ├── llm-reasoning-agent.ts    # Multi-LLM reasoning (graceful fallback)
 │   │   └── deterministic-rules-agent.ts # Rule-based validation
-│   ├── x402.ts                   # x402 payment integration
+│   ├── debate-engine.ts              # AI debate: runDebate(), consensus derivation
+│   ├── premium-reports.ts            # Premium report generation (5 types)
+│   ├── prediction-market.ts          # Prediction market logic
+│   ├── cctp.ts                       # CCTP bridge integration
+│   ├── prediction-engine.ts          # Weighted ensemble voting
+│   ├── verification-engine.ts        # BFT provider verification
+│   ├── consensus.ts                  # Legacy BFT agent consensus
+│   ├── consensus-service.ts          # Central service: specialists, intelligence, reports
+│   ├── team-ratings.ts               # Dynamic ELO + attack/defense strength
+│   ├── providers.ts                  # Football data providers + canonical state
+│   ├── llm/
+│   │   ├── index.ts                  # Gemini → Groq → OpenRouter chain
+│   │   ├── single-flight.ts          # Request deduplication
+│   │   └── circuit-breaker.ts        # Provider failure isolation
+│   ├── x402.ts                       # x402 payment receipts
 │   └── __tests__/
-│       └── consensus.test.ts     # 24 unit tests
-├── mcp-server/
-│   └── index.ts                  # MCP Server v3.1 (7 tools)
+│       └── consensus.test.ts         # 24 unit tests
 ├── components/
-│   ├── MatchCard.tsx             # Match card with mode-aware labels
-│   ├── ConsensusDisplay.tsx      # AI Ensemble / BFT Verification display
-│   ├── VerificationTimeline.tsx  # Step-by-step verification progress
-│   └── SearchBar.tsx             # Match search
+│   ├── IntelligencePanel.tsx         # Main intelligence orchestrator
+│   ├── SpecialistCard.tsx            # Individual specialist agent card
+│   ├── DebateFeed.tsx                # AI debate message feed
+│   ├── PremiumReportCard.tsx         # Premium report purchase card
+│   ├── PredictionMarketPanel.tsx     # Prediction market interface
+│   ├── ConsensusDisplay.tsx          # AI Ensemble / BFT display
+│   ├── VerificationTimeline.tsx      # Step-by-step verification
+│   ├── MatchCard.tsx                 # Match cards
+│   └── Header.tsx                    # Terminal / Developers / Docs nav
+├── mcp-server/
+│   └── index.ts                      # MCP Server v4.0.0 (15 tools)
 ├── package.json
 ├── tsconfig.json
 ├── tailwind.config.ts
@@ -299,11 +284,7 @@ goalconsensus/
 └── .env.example
 ```
 
-## Research Foundation
-
-This project implements BFT consensus principles from:
-
-> [Byzantine Fault Tolerant Consensus for Decentralized Oracle Networks](https://zenodo.org/records/20577665) — Published research on fault-tolerant consensus mechanisms for blockchain oracle systems.
+---
 
 ## License
 

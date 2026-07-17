@@ -113,6 +113,13 @@
     background-clip: text;
   }
 
+  .gradient-text-blue {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
   .gradient-border {
     position: relative;
   }
@@ -166,6 +173,11 @@
   .status-dot-yellow {
     background-color: #eab308;
     box-shadow: 0 0 8px rgba(234, 179, 8, 0.4);
+  }
+
+  .status-dot-blue {
+    background-color: #3b82f6;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
   }
 
   .evidence-card {
@@ -282,6 +294,73 @@
     height: 1.5rem;
     background: rgba(255, 255, 255, 0.06);
   }
+
+  .debate-bubble {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 1rem;
+    padding: 0.875rem 1rem;
+    transition: all 200ms ease-out;
+  }
+
+  .debate-bubble:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .debate-bubble-agree {
+    border-left: 2px solid #22c55e;
+  }
+
+  .debate-bubble-disagree {
+    border-left: 2px solid #ef4444;
+  }
+
+  .debate-bubble-neutral {
+    border-left: 2px solid #eab308;
+  }
+
+  .typing-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    animation: typingBounce 1.4s ease-in-out infinite;
+  }
+
+  .typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  .premium-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 1rem;
+    padding: 1rem;
+    transition: all 200ms ease-out;
+  }
+
+  .premium-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .confidence-bar {
+    height: 3px;
+    border-radius: 1.5px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+
+  .confidence-bar-fill {
+    height: 100%;
+    border-radius: 1.5px;
+    transition: width 0.8s var(--ease-out-expo);
+  }
 }
 
 @layer utilities {
@@ -333,5 +412,14 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
   }
 }
