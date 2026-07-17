@@ -40,7 +40,7 @@ export default function Home() {
                 GoalConsensus
               </h1>
               <p className="text-[11px] text-gray-500">
-                World Cup 2026 Settlement Verification
+                Predict &amp; Verify World Cup 2026 Results
               </p>
             </div>
           </div>
@@ -61,16 +61,13 @@ export default function Home() {
         {/* Hero */}
         <div className="mb-6">
           <p className="text-sm text-gray-300 leading-relaxed max-w-2xl">
-            Every World Cup match result is verified by{" "}
+            GoalConsensus{" "}
             <span className="text-white font-medium">
-              two independent data sources
+              predicts every World Cup 2026 match outcome
             </span>{" "}
-            and{" "}
-            <span className="text-white font-medium">
-              three analysis agents
-            </span>{" "}
-            before being approved for settlement. No single source can
-            fake a result.
+            using three independent analysts — a statistical model, an AI
+            reasoner, and a rule checker. When they agree, the result is
+            verified for on-chain settlement. No single source can lie.
           </p>
         </div>
 
@@ -83,7 +80,7 @@ export default function Home() {
             className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 transition-colors"
           >
             <HelpCircle size={12} />
-            How does settlement verification work?
+            How does it work?
             {showHelp ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
 
@@ -95,13 +92,13 @@ export default function Home() {
                     <span className="text-[10px] text-blue-400 font-bold">1</span>
                   </div>
                   <span className="text-xs text-white font-medium">
-                    Two Data Sources
+                    Cross-Check Data
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-400 leading-relaxed">
-                  We pull match data from football-data.org and
-                  thesportsdb.com independently. Both must agree
-                  on the score before we proceed.
+                  Match scores are pulled from two independent
+                  football data providers. If they disagree,
+                  the match won&apos;t be settled.
                 </p>
               </div>
 
@@ -111,13 +108,13 @@ export default function Home() {
                     <span className="text-[10px] text-purple-400 font-bold">2</span>
                   </div>
                   <span className="text-xs text-white font-medium">
-                    Three Analysts
+                    Predict &amp; Verify
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-400 leading-relaxed">
-                  A stats model, an AI reasoner, and a rule checker
-                  each independently verify the result. They
-                  don&apos;t talk to each other.
+                  Three analysts independently predict and verify
+                  each result: a stats model, an AI reasoner,
+                  and a rule checker.
                 </p>
               </div>
 
@@ -127,13 +124,13 @@ export default function Home() {
                     <CheckCircle2 size={12} className="text-green-400" />
                   </div>
                   <span className="text-xs text-white font-medium">
-                    Safe Settlement
+                    Settle On-Chain
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-400 leading-relaxed">
-                  If at least 2 of 3 analysts agree, the result
-                  is approved for on-chain settlement via
-                  Injective&apos;s x402 micropayments.
+                  When at least 2 of 3 analysts agree, the result
+                  is approved for settlement on Injective via
+                  x402 micropayments.
                 </p>
               </div>
             </div>

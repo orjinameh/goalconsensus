@@ -74,8 +74,25 @@ export async function GET() {
 
       const key = matchKey(first.homeTeam, first.awayTeam);
       const cachedLLM = llmCache.get(key) || [];
-      const allResults = [...fastResults, ...cachedLLM];
       const pending = llmInFlight.has(key);
+
+      const allResults = [...fastResults, ...cachedLLM];
+      if (pending && cachedLLM.length === 0) {
+        allResults.push({
+          agentId: "llm-reasoning",
+          agentName: "AI Reasoning Agent",
+          prediction: {
+            winner: first.homeTeam,
+            homeScore: null,
+            awayScore: null,
+          },
+          confidence: 0,
+          explanation: "Analyzing...",
+          evidence: [],
+          timestamp: new Date().toISOString(),
+          latencyMs: 0,
+        });
+      }
 
       enriched.push({
         ...first,

@@ -24,32 +24,32 @@ const verdictConfig: Record<
   { label: string; color: string; bg: string; icon: typeof CheckCircle2; description: string }
 > = {
   SETTLE: {
-    label: "Verified",
+    label: "Prediction Confirmed",
     color: "text-green-400",
     bg: "bg-green-500/10 border-green-500/20",
     icon: CheckCircle2,
-    description: "All checks passed. Result is safe to settle.",
+    description: "All 3 analysts agree on the result. Safe to settle.",
   },
   DO_NOT_SETTLE: {
-    label: "Disputed",
+    label: "Analysts Disagree",
     color: "text-red-400",
     bg: "bg-red-500/10 border-red-500/20",
     icon: XCircle,
-    description: "Analysts disagree. Do not settle yet.",
+    description: "The analysts don't agree. Do not settle yet.",
   },
   PENDING: {
-    label: "In Progress",
+    label: "Analyzing",
     color: "text-yellow-400",
     bg: "bg-yellow-500/10 border-yellow-500/20",
     icon: Clock,
-    description: "Match hasn't finished yet. Check back later.",
+    description: "Match hasn't finished yet. Prediction updates live.",
   },
   INSUFFICIENT_DATA: {
-    label: "Needs Data",
+    label: "Waiting for Data",
     color: "text-gray-400",
     bg: "bg-gray-500/10 border-gray-500/20",
     icon: AlertTriangle,
-    description: "Not enough data sources to verify this match.",
+    description: "Not enough data sources to make a prediction.",
   },
   UNSUPPORTED_SPORT: {
     label: "Not Supported",
@@ -161,7 +161,7 @@ export function MatchCard({ match }: Props) {
       <div className="px-5 pb-4 grid grid-cols-3 gap-3">
         <div className="bg-white/[0.03] rounded-lg p-2.5 text-center">
           <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
-            Predicted
+            Our Prediction
           </div>
           <div className="text-xs text-white font-medium truncate">
             {predictionLabel}
@@ -203,7 +203,7 @@ export function MatchCard({ match }: Props) {
         >
           <span className="flex items-center gap-2">
             <Shield size={12} />
-            How was this verified?
+            How was this predicted?
           </span>
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
