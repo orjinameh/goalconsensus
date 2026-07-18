@@ -2,7 +2,6 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { z } from "zod";
 
 import {
@@ -28,10 +27,11 @@ import {
   getSupportedChains,
 } from "../lib/cctp.js";
 
-const server = new McpServer({
-  name: "goalconsensus",
-  version: "4.0.0",
-});
+export function createGoalConsensusMcpServer(): McpServer {
+  const server = new McpServer({
+    name: "goalconsensus",
+    version: "4.0.0",
+  });
 
 server.tool(
   "analyze_match",
@@ -640,12 +640,22 @@ server.tool(
   }
 );
 
-async function main() {
-  const useHttp = process.argv.includes("--http");
-  const port = parseInt(process.env.MCP_PORT || "3001", 10);
+  return server;
+}
 
-  if (useHttp) {
+async function main() {
+  const useStdio = !process.argv.includes("--http");
+
+  if (useStdio) {
+    const server = createGoalConsensusMcpServer();
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("GoalConsensus MCP Server v4.0.0 running on stdio");
+  } else {
+    const { SSEServerTransport } = await import("@modelcontextprotocol/sdk/server/sse.js");
     const { createServer } = await import("node:http");
+    const server = createGoalConsensusMcpServer();
+    const port = parseInt(process.env.PORT || process.env.MCP_PORT || "3001", 10);
     const sessions = new Map<string, SSEServerTransport>();
 
     const httpServer = createServer(async (req, res) => {
@@ -696,15 +706,11 @@ async function main() {
       res.end("Not found");
     });
 
-    httpServer.listen(port, () => {
+    httpServer.listen(port, "0.0.0.0", () => {
       console.error(`GoalConsensus MCP Server v4.0.0 running on HTTP (SSE) port ${port}`);
       console.error(`  SSE endpoint: http://localhost:${port}/sse`);
       console.error(`  Messages endpoint: http://localhost:${port}/messages?sessionId=<id>`);
     });
-  } else {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("GoalConsensus MCP Server v4.0.0 running on stdio");
   }
 }
 
