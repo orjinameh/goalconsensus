@@ -60,7 +60,7 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
   const finished = match.status === "FINISHED";
   const live = match.status === "LIVE";
   const hasScore = match.homeScore !== null && match.awayScore !== null;
-  const level = hasConsensus ? confidenceLevel(v.confidence) : 0;
+  const level = hasConsensus ? confidenceLevel(v.confidence) : "low";
   const colorClass = confidenceColor(level);
 
   return (
