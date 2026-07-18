@@ -45,22 +45,7 @@ const DEFAULT_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
 
 const FOOTBALL_DATA_COMPETITIONS = [
-  "PL",
-  "CL",
-  "ELC",
-  "BL1",
-  "FL1",
-  "SA",
-  "PD",
   "WC",
-  "EC",
-  "DED",
-  "BSA",
-  "EL",
-  "ECL",
-  "NationsLeague",
-  "CLI",
-  "MLS",
 ];
 
 function normalizeTeamName(name: string): string {
@@ -185,7 +170,7 @@ class FootballDataProvider implements Provider {
   async healthCheck(): Promise<ProviderHealth> {
     const start = Date.now();
     try {
-      await axios.get(`${this.metadata.baseUrl}/competitions/PL/matches`, {
+      await axios.get(`${this.metadata.baseUrl}/competitions/WC/matches`, {
         headers: { "X-Auth-Token": process.env.FOOTBALL_DATA_API_KEY || "" },
         timeout: DEFAULT_TIMEOUT,
         params: { status: "LIVE,SCHEDULED,FINISHED" },
@@ -210,15 +195,6 @@ class FootballDataProvider implements Provider {
 
 const THESPORTSDB_LEAGUES: Array<{ id: string; name: string }> = [
   { id: "4429", name: "FIFA World Cup" },
-  { id: "4328", name: "English Premier League" },
-  { id: "4335", name: "Spanish La Liga" },
-  { id: "4334", name: "French Ligue 1" },
-  { id: "4331", name: "German Bundesliga" },
-  { id: "4332", name: "Italian Serie A" },
-  { id: "4339", name: "Dutch Eredivisie" },
-  { id: "4340", name: "Champions League" },
-  { id: "4344", name: "Copa Libertadores" },
-  { id: "4380", name: "MLS" },
 ];
 
 class TheSportsDBProvider implements Provider {
@@ -311,7 +287,7 @@ class TheSportsDBProvider implements Provider {
     const start = Date.now();
     try {
       await axios.get(
-        `${this.metadata.baseUrl}/eventsseason.php?id=4328&s=${new Date().getFullYear()}`,
+        `${this.metadata.baseUrl}/eventsseason.php?id=4429&s=${new Date().getFullYear()}`,
         { timeout: DEFAULT_TIMEOUT }
       );
       return {

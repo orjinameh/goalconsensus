@@ -244,9 +244,9 @@ export default function HomePage() {
             <div className="flex flex-wrap items-center justify-center gap-2">
               <span className="text-2xs text-text-muted mr-1">Try now:</span>
               {[
-                { home: "Arsenal", away: "Chelsea" },
-                { home: "Real Madrid", away: "Barcelona" },
-                { home: "Liverpool", away: "Manchester City" },
+                { home: "Brazil", away: "Morocco" },
+                { home: "Argentina", away: "Germany" },
+                { home: "Japan", away: "Spain" },
               ].map((ex) => (
                 <button
                   key={`${ex.home}-${ex.away}`}

@@ -54,12 +54,13 @@ const statusConfig: Record<
 
 export function MatchCard({ match, onClick, className }: MatchCardProps) {
   const v = match.consensus;
-  const verdict = statusConfig[v.settlementDecision] || statusConfig.PENDING;
+  const hasConsensus = !!v;
+  const verdict = hasConsensus ? (statusConfig[v.settlementDecision] || statusConfig.PENDING) : statusConfig.INSUFFICIENT_DATA;
   const VerdictIcon = verdict.icon;
   const finished = match.status === "FINISHED";
   const live = match.status === "LIVE";
   const hasScore = match.homeScore !== null && match.awayScore !== null;
-  const level = confidenceLevel(v.confidence);
+  const level = hasConsensus ? confidenceLevel(v.confidence) : 0;
   const colorClass = confidenceColor(level);
 
   return (
@@ -143,13 +144,21 @@ export function MatchCard({ match, onClick, className }: MatchCardProps) {
         {/* Bottom row: consensus info + CTA */}
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
           <div className="flex items-center gap-3">
-            <div className="text-2xs text-text-muted">
-              {v.agreement}/{v.totalAgents} agree
-            </div>
-            <div className="w-px h-3 bg-border-subtle" />
-            <div className={cn("text-2xs font-medium", colorClass)}>
-              {v.confidence}%
-            </div>
+            {hasConsensus ? (
+              <>
+                <div className="text-2xs text-text-muted">
+                  {v.agreement}/{v.totalAgents} agree
+                </div>
+                <div className="w-px h-3 bg-border-subtle" />
+                <div className={cn("text-2xs font-medium", colorClass)}>
+                  {v.confidence}%
+                </div>
+              </>
+            ) : (
+              <div className="text-2xs text-text-muted">
+                Click to analyze
+              </div>
+            )}
           </div>
           <div className="text-2xs text-accent-green font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             Analyze &rarr;

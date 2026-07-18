@@ -66,8 +66,12 @@ export function placeBet(
   amount: number
 ): { success: boolean; market: PredictionMarketState; error?: string; cctpTransfer?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } } {
   const key = marketKey(homeTeam, awayTeam);
-  const market = marketStore.get(key);
-  if (!market) return { success: false, market: getOrCreateMarket(homeTeam, awayTeam, 1500, 1500), error: "Market not found" };
+  let market = marketStore.get(key);
+  if (!market) {
+    const home = 1500;
+    const away = 1500;
+    market = getOrCreateMarket(homeTeam, awayTeam, home, away);
+  }
   if (market.resolved) return { success: false, market, error: "Market already resolved" };
   if (amount <= 0) return { success: false, market, error: "Invalid amount" };
 

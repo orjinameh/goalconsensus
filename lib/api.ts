@@ -12,7 +12,7 @@ export interface MatchWithConsensus {
   sport: "FOOTBALL";
   providerId: string;
   competition?: string;
-  consensus: ConsensusResult;
+  consensus?: ConsensusResult;
   llmPending: boolean;
 }
 
