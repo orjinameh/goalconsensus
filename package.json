@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "mcp": "tsx mcp-server/index.ts",
+    "mcp:http": "tsx mcp-server/index.ts --http",
     "test": "tsx --test lib/__tests__/*.test.ts",
     "lint": "next lint"
   },

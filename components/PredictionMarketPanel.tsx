@@ -11,6 +11,15 @@ interface PredictionMarketPanelProps {
   totalStaked: number;
   onStake: (side: "home" | "draw" | "away", amount: number) => void;
   isResolving?: boolean;
+  cctpTransfers?: {
+    id: string;
+    fromChain: string;
+    toChain: string;
+    amount: string;
+    status: "pending" | "confirmed" | "failed";
+    txHash: string;
+    timestamp: string;
+  }[];
 }
 
 type Side = "home" | "draw" | "away";
@@ -33,6 +42,7 @@ export function PredictionMarketPanel({
   totalStaked,
   onStake,
   isResolving = false,
+  cctpTransfers = [],
 }: PredictionMarketPanelProps) {
   const [selectedSide, setSelectedSide] = useState<Side | null>(null);
   const [amount, setAmount] = useState<string>("");
@@ -223,12 +233,47 @@ export function PredictionMarketPanel({
       </div>
 
       <div className="px-4 py-3 bg-surface-3 border-t border-border-subtle">
-        <div className="flex items-center gap-2">
-          <ArrowRightLeft size={11} className="text-accent-blue shrink-0" />
-          <span className="text-2xs text-text-muted">
-            Bridge USDC via CCTP to deposit and participate in markets
-          </span>
-        </div>
+        {cctpTransfers.length > 0 ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-2">
+              <ArrowRightLeft size={11} className="text-accent-blue shrink-0" />
+              <span className="text-2xs font-medium text-text-secondary">CCTP Transfers</span>
+            </div>
+            {cctpTransfers.slice(-3).reverse().map((t) => (
+              <div key={t.id} className="flex items-center justify-between text-2xs">
+                <div className="flex items-center gap-1.5">
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    t.status === "confirmed" ? "bg-accent-green" :
+                    t.status === "pending" ? "bg-accent-yellow animate-pulse" :
+                    "bg-red-500"
+                  )} />
+                  <span className="text-text-muted">
+                    {t.fromChain.replace("-", " ")} → {t.toChain.replace("-", " ")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-text-secondary">${t.amount}</span>
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded text-2xs font-medium",
+                    t.status === "confirmed" ? "bg-accent-green-dim text-accent-green" :
+                    t.status === "pending" ? "bg-accent-yellow-dim text-accent-yellow" :
+                    "bg-red-500/10 text-red-400"
+                  )}>
+                    {t.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft size={11} className="text-accent-blue shrink-0" />
+            <span className="text-2xs text-text-muted">
+              Bridge USDC via CCTP to deposit and participate in markets
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

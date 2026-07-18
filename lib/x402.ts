@@ -74,5 +74,31 @@ export function x402PaymentRequired(toolName: string): X402PaymentRequired {
 
 export function verifyX402Payment(header: string | null): boolean {
   if (!header) return false;
-  return header.startsWith("x402/") || header.includes("X-PAYMENT");
+  const h = header.trim();
+  if (h.startsWith("x402/payment")) return true;
+  if (h.includes("X-PAYMENT") && h.includes("0x")) return true;
+  return false;
+}
+
+export function x402ForbiddenResponse(toolName: string) {
+  return {
+    content: [{
+      type: "text" as const,
+      text: JSON.stringify({
+        error: "x402 payment required",
+        status: 402,
+        protocol: "x402",
+        tool: toolName,
+        payment: {
+          amount: "0.001 USDC",
+          token: "USDC",
+          chain: "Injective Testnet",
+          networkId: INJECTIVE_TESTNET_CHAIN_ID,
+          endpoint: `${INJECTIVE_TESTNET_CHAIN_ID}.evm.neutron.org`,
+        },
+        x402Version: "1",
+        message: `To use the ${toolName} tool, include an X-PAYMENT header with a valid x402 payment proof.`,
+      }, null, 2),
+    }],
+  };
 }

@@ -2,6 +2,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { z } from "zod";
 
 import {
@@ -14,7 +15,7 @@ import {
   getPremiumReport,
   getReportCatalogInfo,
 } from "../lib/consensus-service.js";
-import { chargeX402, formatX402Header } from "../lib/x402.js";
+import { chargeX402, formatX402Header, verifyX402Payment, x402ForbiddenResponse } from "../lib/x402.js";
 import { getTeamRating } from "../lib/team-ratings.js";
 import {
   getOrCreateMarket,
@@ -331,8 +332,13 @@ server.tool(
     homeTeam: z.string().describe("Home team name"),
     awayTeam: z.string().describe("Away team name"),
     reportType: z.enum(["full-tactical", "historical-breakdown", "player-report", "market-intelligence", "risk-report"]).describe("Type of premium report"),
+    x402Payment: z.string().optional().describe("X-PAYMENT header value with x402 payment proof. If not provided, the tool returns a 402 Payment Required response with payment instructions."),
   },
-  async ({ homeTeam, awayTeam, reportType }) => {
+  async ({ homeTeam, awayTeam, reportType, x402Payment }) => {
+    if (!verifyX402Payment(x402Payment ?? null)) {
+      return x402ForbiddenResponse("premium_report") as any;
+    }
+
     const report = await getPremiumReport(reportType, homeTeam, awayTeam);
     const queryId = `mcp-premium-${Date.now()}`;
     const payment = chargeX402("premium_report", queryId);
@@ -635,9 +641,71 @@ server.tool(
 );
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("GoalConsensus MCP Server v4.0.0 running on stdio");
+  const useHttp = process.argv.includes("--http");
+  const port = parseInt(process.env.MCP_PORT || "3001", 10);
+
+  if (useHttp) {
+    const { createServer } = await import("node:http");
+    const sessions = new Map<string, SSEServerTransport>();
+
+    const httpServer = createServer(async (req, res) => {
+      const url = new URL(req.url || "/", `http://localhost:${port}`);
+
+      if (url.pathname === "/sse" && req.method === "GET") {
+        const transport = new SSEServerTransport("/messages", res);
+        sessions.set(transport.sessionId, transport);
+        res.on("close", () => sessions.delete(transport.sessionId));
+        await server.connect(transport);
+        return;
+      }
+
+      if (url.pathname === "/messages" && req.method === "POST") {
+        const sessionId = url.searchParams.get("sessionId") || "";
+        const transport = sessions.get(sessionId);
+        if (!transport) {
+          res.writeHead(404);
+          res.end("Session not found");
+          return;
+        }
+        await transport.handlePostMessage(req, res);
+        return;
+      }
+
+      if (url.pathname === "/" && req.method === "GET") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          name: "GoalConsensus MCP Server",
+          version: "4.0.0",
+          transport: "SSE",
+          endpoints: {
+            sse: "/sse",
+            messages: "/messages?sessionId=<id>",
+          },
+          tools: [
+            "analyze_match", "compare_teams", "historical_analysis",
+            "market_analysis", "consensus", "player_report", "injury_report",
+            "premium_report", "predict_match", "verify_result", "verify_settlement",
+            "get_provider_consensus", "get_live_matches", "qualification_scenarios",
+            "get_report_catalog",
+          ],
+        }, null, 2));
+        return;
+      }
+
+      res.writeHead(404);
+      res.end("Not found");
+    });
+
+    httpServer.listen(port, () => {
+      console.error(`GoalConsensus MCP Server v4.0.0 running on HTTP (SSE) port ${port}`);
+      console.error(`  SSE endpoint: http://localhost:${port}/sse`);
+      console.error(`  Messages endpoint: http://localhost:${port}/messages?sessionId=<id>`);
+    });
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("GoalConsensus MCP Server v4.0.0 running on stdio");
+  }
 }
 
 main().catch((err) => {

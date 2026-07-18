@@ -1,4 +1,5 @@
 import type { PredictionMarketState, PredictionMarketOdds, PredictionMarketPosition } from "./agents/types";
+import { initiateCCTPTransfer } from "./cctp";
 
 const marketStore = new Map<string, PredictionMarketState>();
 
@@ -51,6 +52,7 @@ export function getOrCreateMarket(
     resolved: false,
     result: null,
     settlementTxHash: null,
+    cctpTransfers: [],
   };
 
   marketStore.set(key, state);
@@ -62,7 +64,7 @@ export function placeBet(
   awayTeam: string,
   side: "home" | "draw" | "away",
   amount: number
-): { success: boolean; market: PredictionMarketState; error?: string } {
+): { success: boolean; market: PredictionMarketState; error?: string; cctpTransfer?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } } {
   const key = marketKey(homeTeam, awayTeam);
   const market = marketStore.get(key);
   if (!market) return { success: false, market: getOrCreateMarket(homeTeam, awayTeam, 1500, 1500), error: "Market not found" };
@@ -76,14 +78,32 @@ export function placeBet(
   position.potentialPayout = position.amount * (1 / position.odds);
   market.totalStaked += amount;
 
-  return { success: true, market };
+  const cctpTransfer = initiateCCTPTransfer({
+    amount: amount.toFixed(2),
+    fromChain: "base-sepolia",
+    toChain: "injective-testnet",
+    sender: `0x${Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`,
+    recipient: `inj1${Array.from({ length: 38 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`,
+  });
+
+  market.cctpTransfers.push({
+    id: cctpTransfer.id,
+    fromChain: cctpTransfer.fromChain,
+    toChain: cctpTransfer.toChain,
+    amount: cctpTransfer.amount,
+    status: cctpTransfer.status,
+    txHash: cctpTransfer.txHash,
+    timestamp: cctpTransfer.timestamp,
+  });
+
+  return { success: true, market, cctpTransfer: { id: cctpTransfer.id, fromChain: cctpTransfer.fromChain, toChain: cctpTransfer.toChain, amount: cctpTransfer.amount, status: cctpTransfer.status, txHash: cctpTransfer.txHash } };
 }
 
 export function resolveMarket(
   homeTeam: string,
   awayTeam: string,
   result: "home" | "draw" | "away"
-): { market: PredictionMarketState; winners: { side: string; payout: number }[] } {
+): { market: PredictionMarketState; winners: { side: string; payout: number; cctpSettlement?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } }[] } {
   const key = marketKey(homeTeam, awayTeam);
   let market = marketStore.get(key);
   if (!market) {
@@ -94,10 +114,28 @@ export function resolveMarket(
   market.result = result;
   market.settlementTxHash = `0x${Array.from({ length: 64 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`;
 
-  const winners: { side: string; payout: number }[] = [];
+  const winners: { side: string; payout: number; cctpSettlement?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } }[] = [];
   for (const pos of market.positions) {
     if (pos.side === result && pos.amount > 0) {
-      winners.push({ side: pos.side, payout: pos.potentialPayout });
+      const settlement = initiateCCTPTransfer({
+        amount: pos.potentialPayout.toFixed(2),
+        fromChain: "injective-testnet",
+        toChain: "base-sepolia",
+        sender: `inj1${Array.from({ length: 38 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`,
+        recipient: `0x${Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`,
+      });
+
+      market.cctpTransfers.push({
+        id: settlement.id,
+        fromChain: settlement.fromChain,
+        toChain: settlement.toChain,
+        amount: settlement.amount,
+        status: settlement.status,
+        txHash: settlement.txHash,
+        timestamp: settlement.timestamp,
+      });
+
+      winners.push({ side: pos.side, payout: pos.potentialPayout, cctpSettlement: { id: settlement.id, fromChain: settlement.fromChain, toChain: settlement.toChain, amount: settlement.amount, status: settlement.status, txHash: settlement.txHash } });
     }
   }
 

@@ -88,6 +88,15 @@ export function IntelligencePanel({ homeTeam, awayTeam, onBack }: IntelligencePa
   const [reportContents, setReportContents] = useState<Record<string, string>>({});
   const [loadingReport, setLoadingReport] = useState<string | null>(null);
   const [showMarket, setShowMarket] = useState(false);
+  const [cctpTransfers, setCctpTransfers] = useState<{
+    id: string;
+    fromChain: string;
+    toChain: string;
+    amount: string;
+    status: "pending" | "confirmed" | "failed";
+    txHash: string;
+    timestamp: string;
+  }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -411,9 +420,22 @@ export function IntelligencePanel({ homeTeam, awayTeam, onBack }: IntelligencePa
                     awayTeam={awayTeam}
                     odds={{ home: 2.1, draw: 3.4, away: 3.8 }}
                     totalStaked={1250}
-                    onStake={(side, amount) => {
-                      console.log(`Staking ${amount} on ${side}`);
+                    onStake={async (side, amount) => {
+                      try {
+                        const res = await fetch("/api/market/stake", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ homeTeam, awayTeam, side, amount }),
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          if (data.cctpTransfer) {
+                            setCctpTransfers((prev) => [...prev, data.cctpTransfer]);
+                          }
+                        }
+                      } catch {}
                     }}
+                    cctpTransfers={cctpTransfers}
                   />
                 )}
 

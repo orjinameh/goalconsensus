@@ -239,4 +239,13 @@ export interface PredictionMarketState {
   resolved: boolean;
   result: "home" | "draw" | "away" | null;
   settlementTxHash: string | null;
+  cctpTransfers: {
+    id: string;
+    fromChain: string;
+    toChain: string;
+    amount: string;
+    status: "pending" | "confirmed" | "failed";
+    txHash: string;
+    timestamp: string;
+  }[];
 }
