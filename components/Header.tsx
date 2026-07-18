@@ -2,6 +2,7 @@
 
 import { Shield, Code2, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { WalletButton } from "./WalletButton";
 
 interface HeaderProps {
   paymentCount?: number;
@@ -39,7 +40,10 @@ export function Header({ paymentCount = 0, activeView, onNavigate, className }: 
           </div>
         </a>
 
-        <nav className="flex items-center gap-1" role="navigation" aria-label="Main navigation">
+        <div className="flex items-center gap-3">
+          <WalletButton />
+
+          <nav className="flex items-center gap-1" role="navigation" aria-label="Main navigation">
           <button
             onClick={() => onNavigate?.("terminal")}
             className={cn(
@@ -92,6 +96,7 @@ export function Header({ paymentCount = 0, activeView, onNavigate, className }: 
             </div>
           )}
         </nav>
+        </div>
       </div>
     </header>
   );

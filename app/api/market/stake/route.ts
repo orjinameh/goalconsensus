@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { placeBet } from "@/lib/prediction-market";
+import { getAddressFromRequest } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +11,8 @@ export async function POST(request: Request) {
     if (matchStatus && matchStatus !== "SCHEDULED") {
       return NextResponse.json({ error: `Cannot bet on ${matchStatus.toLowerCase()} matches` }, { status: 400 });
     }
-    const result = placeBet(homeTeam, awayTeam, side, amount, matchStatus);
+    const userAddress = getAddressFromRequest(request) || undefined;
+    const result = await placeBet(homeTeam, awayTeam, side, amount, matchStatus, userAddress);
     if (!result.success) {
       return NextResponse.json(result, { status: 400 });
     }

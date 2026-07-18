@@ -179,7 +179,7 @@ server.tool(
   async ({ homeTeam, awayTeam }) => {
     const home = getTeamRating(homeTeam);
     const away = getTeamRating(awayTeam);
-    const market = getOrCreateMarket(homeTeam, awayTeam, home.rating, away.rating);
+    const market = await getOrCreateMarket(homeTeam, awayTeam, home.rating, away.rating);
     const queryId = `mcp-market-${Date.now()}`;
     const payment = chargeX402("market_analysis", queryId);
 

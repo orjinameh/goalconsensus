@@ -10,10 +10,10 @@ export async function GET(request: Request) {
   if (homeTeam && awayTeam) {
     const home = getTeamRating(homeTeam);
     const away = getTeamRating(awayTeam);
-    const market = getOrCreateMarket(homeTeam, awayTeam, home.rating, away.rating);
+    const market = await getOrCreateMarket(homeTeam, awayTeam, home.elo, away.elo);
     return NextResponse.json({ market });
   }
 
-  const markets = getAllMarkets();
+  const markets = await getAllMarkets();
   return NextResponse.json({ markets });
 }

@@ -478,9 +478,13 @@ export function IntelligencePanel({ homeTeam, awayTeam, matchStatus, onBack }: I
                     onStake={async (side, amount) => {
                       setStakeError(null);
                       try {
+                        const token = localStorage.getItem("gc-auth-token");
                         const res = await fetch("/api/market/stake", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json" },
+                          headers: {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                          },
                           body: JSON.stringify({ homeTeam, awayTeam, side, amount, matchStatus }),
                         });
                         const data = await res.json();

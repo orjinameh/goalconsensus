@@ -1,8 +1,7 @@
 import type { PredictionMarketState, PredictionMarketOdds, PredictionMarketPosition } from "./agents/types";
 import { initiateCCTPTransfer } from "./cctp";
 import { getTeamRating } from "./team-ratings";
-
-const marketStore = new Map<string, PredictionMarketState>();
+import { connectToDatabase } from "./mongodb";
 
 function marketKey(homeTeam: string, awayTeam: string): string {
   return `${homeTeam.toLowerCase()}|${awayTeam.toLowerCase()}`;
@@ -28,18 +27,10 @@ function computeOdds(homeRating: number, awayRating: number): PredictionMarketOd
   };
 }
 
-export function getOrCreateMarket(
-  homeTeam: string,
-  awayTeam: string,
-  homeRating: number,
-  awayRating: number
-): PredictionMarketState {
+function freshMarket(homeTeam: string, awayTeam: string, homeRating: number, awayRating: number): PredictionMarketState {
   const key = marketKey(homeTeam, awayTeam);
-  const existing = marketStore.get(key);
-  if (existing) return existing;
-
   const odds = computeOdds(homeRating, awayRating);
-  const state: PredictionMarketState = {
+  return {
     matchKey: key,
     homeTeam,
     awayTeam,
@@ -55,28 +46,41 @@ export function getOrCreateMarket(
     settlementTxHash: null,
     cctpTransfers: [],
   };
-
-  marketStore.set(key, state);
-  return state;
 }
 
-export function placeBet(
+export async function getOrCreateMarket(
+  homeTeam: string,
+  awayTeam: string,
+  homeRating: number,
+  awayRating: number
+): Promise<PredictionMarketState> {
+  const db = await connectToDatabase();
+  const key = marketKey(homeTeam, awayTeam);
+  const existing = await db.collection("markets").findOne({ matchKey: key });
+  if (existing) return existing as unknown as PredictionMarketState;
+
+  const market = freshMarket(homeTeam, awayTeam, homeRating, awayRating);
+  await db.collection("markets").insertOne(market as never);
+  return market;
+}
+
+export async function placeBet(
   homeTeam: string,
   awayTeam: string,
   side: "home" | "draw" | "away",
   amount: number,
-  matchStatus?: string
-): { success: boolean; market: PredictionMarketState; error?: string; cctpTransfer?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } } {
+  matchStatus?: string,
+  userAddress?: string
+): Promise<{ success: boolean; market: PredictionMarketState; error?: string; cctpTransfer?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } }> {
   if (matchStatus && matchStatus !== "SCHEDULED") {
-    return { success: false, market: getOrCreateMarket(homeTeam, awayTeam, getTeamRating(homeTeam).elo, getTeamRating(awayTeam).elo), error: `Cannot bet on ${matchStatus.toLowerCase()} matches` };
+    const market = await getOrCreateMarket(homeTeam, awayTeam, getTeamRating(homeTeam).elo, getTeamRating(awayTeam).elo);
+    return { success: false, market, error: `Cannot bet on ${matchStatus.toLowerCase()} matches` };
   }
+
+  const db = await connectToDatabase();
   const key = marketKey(homeTeam, awayTeam);
-  let market = marketStore.get(key);
-  if (!market) {
-    const home = getTeamRating(homeTeam).elo;
-    const away = getTeamRating(awayTeam).elo;
-    market = getOrCreateMarket(homeTeam, awayTeam, home, away);
-  }
+  let market = await getOrCreateMarket(homeTeam, awayTeam, getTeamRating(homeTeam).elo, getTeamRating(awayTeam).elo);
+
   if (market.resolved) return { success: false, market, error: "Market already resolved" };
   if (amount <= 0) return { success: false, market, error: "Invalid amount" };
 
@@ -91,7 +95,7 @@ export function placeBet(
     amount: amount.toFixed(2),
     fromChain: "base-sepolia",
     toChain: "injective-testnet",
-    sender: `0x${Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`,
+    sender: userAddress || `0x${Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`,
     recipient: `inj1${Array.from({ length: 38 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`,
   });
 
@@ -105,19 +109,42 @@ export function placeBet(
     timestamp: cctpTransfer.timestamp,
   });
 
+  await db.collection("markets").updateOne(
+    { matchKey: key },
+    { $set: { odds: market.odds, totalStaked: market.totalStaked, positions: market.positions, cctpTransfers: market.cctpTransfers } }
+  );
+
+  await db.collection("bets").insertOne({
+    userAddress: userAddress || "anonymous",
+    marketKey: key,
+    homeTeam,
+    awayTeam,
+    side,
+    amount,
+    odds: position.odds,
+    potentialPayout: position.potentialPayout,
+    cctpTransferId: cctpTransfer.id,
+    createdAt: new Date().toISOString(),
+  });
+
+  if (userAddress) {
+    await db.collection("users").updateOne(
+      { address: userAddress.toLowerCase() },
+      { $inc: { totalStaked: amount, betsCount: 1 } }
+    );
+  }
+
   return { success: true, market, cctpTransfer: { id: cctpTransfer.id, fromChain: cctpTransfer.fromChain, toChain: cctpTransfer.toChain, amount: cctpTransfer.amount, status: cctpTransfer.status, txHash: cctpTransfer.txHash } };
 }
 
-export function resolveMarket(
+export async function resolveMarket(
   homeTeam: string,
   awayTeam: string,
   result: "home" | "draw" | "away"
-): { market: PredictionMarketState; winners: { side: string; payout: number; cctpSettlement?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } }[] } {
+): Promise<{ market: PredictionMarketState; winners: { side: string; payout: number; cctpSettlement?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } }[] }> {
+  const db = await connectToDatabase();
   const key = marketKey(homeTeam, awayTeam);
-  let market = marketStore.get(key);
-  if (!market) {
-    market = getOrCreateMarket(homeTeam, awayTeam, 1500, 1500);
-  }
+  let market = await getOrCreateMarket(homeTeam, awayTeam, 1500, 1500);
 
   market.resolved = true;
   market.result = result;
@@ -148,13 +175,23 @@ export function resolveMarket(
     }
   }
 
+  await db.collection("markets").updateOne(
+    { matchKey: key },
+    { $set: { resolved: true, result, settlementTxHash: market.settlementTxHash, cctpTransfers: market.cctpTransfers } }
+  );
+
   return { market, winners };
 }
 
-export function getMarket(homeTeam: string, awayTeam: string): PredictionMarketState | null {
-  return marketStore.get(marketKey(homeTeam, awayTeam)) || null;
+export async function getMarket(homeTeam: string, awayTeam: string): Promise<PredictionMarketState | null> {
+  const db = await connectToDatabase();
+  const key = marketKey(homeTeam, awayTeam);
+  const doc = await db.collection("markets").findOne({ matchKey: key });
+  return (doc as unknown as PredictionMarketState) || null;
 }
 
-export function getAllMarkets(): PredictionMarketState[] {
-  return Array.from(marketStore.values());
+export async function getAllMarkets(): Promise<PredictionMarketState[]> {
+  const db = await connectToDatabase();
+  const docs = await db.collection("markets").find({}).toArray();
+  return docs as unknown as PredictionMarketState[];
 }
