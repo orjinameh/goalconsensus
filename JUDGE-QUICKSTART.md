@@ -28,7 +28,11 @@ No API keys? The app still loads — it will show matches from football-data.org
 6. **Try a premium report** — Click "Purchase" on any report (x402 gated, 0.002 USDC)
 7. **Prediction market** — Expand to see odds, place a stake, CCTP settlement shown
 8. **Developer Portal** — Click "Developers" in nav for MCP tools, API docs, x402 pricing
-9. **MCP Server** — Run `npm run mcp` then test with: `echo '{"tool":"get_live_matches"}' | npx tsx mcp-server/index.ts`
+9. **MCP Server** — Deployed at `https://goalconsensus.onrender.com/mcp/sse`. Any AI agent can connect via:
+   ```json
+   { "mcpServers": { "goalconsensus": { "url": "https://goalconsensus.onrender.com/mcp/sse" } } }
+   ```
+   Or run locally: `npm run mcp` (stdio) or `npm run mcp:http` (HTTP on port 3001)
 
 ## Injective Technologies Used
 

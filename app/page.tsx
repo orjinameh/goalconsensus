@@ -518,12 +518,7 @@ curl -X POST http://localhost:3000/api/intelligence \\
   const mcpConfig = `{
   "mcpServers": {
     "goalconsensus": {
-      "command": "npx",
-      "args": ["tsx", "mcp-server/index.ts"],
-      "env": {
-        "FOOTBALL_DATA_API_KEY": "",
-        "GEMINI_API_KEY": ""
-      }
+      "url": "https://goalconsensus.onrender.com/mcp/sse"
     }
   }
 }`;

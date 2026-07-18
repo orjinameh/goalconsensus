@@ -33,8 +33,19 @@ The GoalConsensus MCP server exposes 15 tools. Connect via stdio:
 }
 ```
 
-Or via HTTP (SSE transport):
+Or via HTTP (SSE transport) — deployed at:
 
+```json
+{
+  "mcpServers": {
+    "goalconsensus": {
+      "url": "https://goalconsensus.onrender.com/mcp/sse"
+    }
+  }
+}
+```
+
+Local HTTP mode:
 ```bash
 npm run mcp:http   # Starts on port 3001
 # SSE endpoint: http://localhost:3001/sse
