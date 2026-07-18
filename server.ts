@@ -55,7 +55,7 @@ app.prepare().then(() => {
       return;
     }
 
-    handle(req, res, url);
+    handle(req, res);
   });
 
   const port = parseInt(process.env.PORT || "3000", 10);
