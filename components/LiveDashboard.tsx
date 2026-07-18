@@ -28,7 +28,7 @@ interface EnrichedMatch {
 }
 
 interface LiveDashboardProps {
-  onSelectMatch?: (homeTeam: string, awayTeam: string) => void;
+  onSelectMatch?: (homeTeam: string, awayTeam: string, status?: string) => void;
 }
 
 export function LiveDashboard({ onSelectMatch }: LiveDashboardProps) {
@@ -111,7 +111,7 @@ export function LiveDashboard({ onSelectMatch }: LiveDashboardProps) {
         <MatchCard
           key={m.id}
           match={m as never}
-          onClick={() => onSelectMatch?.(m.homeTeam, m.awayTeam)}
+            onClick={() => onSelectMatch?.(m.homeTeam, m.awayTeam, m.status)}
         />
       ))}
     </div>

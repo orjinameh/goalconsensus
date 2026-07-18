@@ -1,5 +1,6 @@
 import type { PredictionMarketState, PredictionMarketOdds, PredictionMarketPosition } from "./agents/types";
 import { initiateCCTPTransfer } from "./cctp";
+import { getTeamRating } from "./team-ratings";
 
 const marketStore = new Map<string, PredictionMarketState>();
 
@@ -63,13 +64,17 @@ export function placeBet(
   homeTeam: string,
   awayTeam: string,
   side: "home" | "draw" | "away",
-  amount: number
+  amount: number,
+  matchStatus?: string
 ): { success: boolean; market: PredictionMarketState; error?: string; cctpTransfer?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string } } {
+  if (matchStatus && matchStatus !== "SCHEDULED") {
+    return { success: false, market: getOrCreateMarket(homeTeam, awayTeam, getTeamRating(homeTeam).elo, getTeamRating(awayTeam).elo), error: `Cannot bet on ${matchStatus.toLowerCase()} matches` };
+  }
   const key = marketKey(homeTeam, awayTeam);
   let market = marketStore.get(key);
   if (!market) {
-    const home = 1500;
-    const away = 1500;
+    const home = getTeamRating(homeTeam).elo;
+    const away = getTeamRating(awayTeam).elo;
     market = getOrCreateMarket(homeTeam, awayTeam, home, away);
   }
   if (market.resolved) return { success: false, market, error: "Market already resolved" };

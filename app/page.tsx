@@ -122,7 +122,7 @@ const HOW_IT_WORKS = [
 
 export default function HomePage() {
   const [view, setView] = useState<"terminal" | "intelligence" | "developers" | "docs">("terminal");
-  const [selectedMatch, setSelectedMatch] = useState<{ home: string; away: string } | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<{ home: string; away: string; status?: string } | null>(null);
   const [matches, setMatches] = useState<MatchWithConsensus[]>([]);
   const [providerHealth, setProviderHealth] = useState<{ providerId: string; available: boolean; latencyMs: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,8 +170,8 @@ export default function HomePage() {
     };
   }, [loadData]);
 
-  const handleSelectMatch = (homeTeam: string, awayTeam: string) => {
-    setSelectedMatch({ home: homeTeam, away: awayTeam });
+  const handleSelectMatch = (homeTeam: string, awayTeam: string, status?: string) => {
+    setSelectedMatch({ home: homeTeam, away: awayTeam, status });
     setView("intelligence");
     try {
       const count = parseInt(localStorage.getItem("x402-payment-count") || "0", 10);
@@ -190,6 +190,7 @@ export default function HomePage() {
       <IntelligencePanel
         homeTeam={selectedMatch.home}
         awayTeam={selectedMatch.away}
+        matchStatus={selectedMatch.status}
         onBack={handleBack}
       />
     );
@@ -426,7 +427,7 @@ export default function HomePage() {
                   <MatchCard
                     key={m.id}
                     match={m}
-                    onClick={() => handleSelectMatch(m.homeTeam, m.awayTeam)}
+                    onClick={() => handleSelectMatch(m.homeTeam, m.awayTeam, m.status)}
                   />
                 ))}
               </div>

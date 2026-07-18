@@ -23,6 +23,7 @@ import { ConfidenceGauge } from "./ConfidenceGauge";
 interface IntelligencePanelProps {
   homeTeam: string;
   awayTeam: string;
+  matchStatus?: string;
   onBack: () => void;
 }
 
@@ -78,7 +79,7 @@ const LOADING_MESSAGES = [
   "Finalizing intelligence report...",
 ];
 
-export function IntelligencePanel({ homeTeam, awayTeam, onBack }: IntelligencePanelProps) {
+export function IntelligencePanel({ homeTeam, awayTeam, matchStatus, onBack }: IntelligencePanelProps) {
   const [phase, setPhase] = useState<"loading" | "agents" | "debate" | "consensus" | "ready">("loading");
   const [visibleAgents, setVisibleAgents] = useState(0);
   const [specialists, setSpecialists] = useState<SpecialistOutput[]>([]);
@@ -88,6 +89,8 @@ export function IntelligencePanel({ homeTeam, awayTeam, onBack }: IntelligencePa
   const [reportContents, setReportContents] = useState<Record<string, string>>({});
   const [loadingReport, setLoadingReport] = useState<string | null>(null);
   const [showMarket, setShowMarket] = useState(false);
+  const [marketData, setMarketData] = useState<{ odds: { home: number; draw: number; away: number }; totalStaked: number } | null>(null);
+  const [stakeError, setStakeError] = useState<string | null>(null);
   const [cctpTransfers, setCctpTransfers] = useState<{
     id: string;
     fromChain: string;
@@ -144,6 +147,17 @@ export function IntelligencePanel({ homeTeam, awayTeam, onBack }: IntelligencePa
       setPhase("consensus");
       await new Promise((r) => setTimeout(r, 400));
       setPhase("ready");
+
+      // Fetch real market data
+      try {
+        const marketRes = await fetch(`/api/market?homeTeam=${encodeURIComponent(homeTeam)}&awayTeam=${encodeURIComponent(awayTeam)}`);
+        if (marketRes.ok) {
+          const marketJson = await marketRes.json();
+          if (marketJson.market) {
+            setMarketData({ odds: marketJson.market.odds, totalStaked: marketJson.market.totalStaked });
+          }
+        }
+      } catch {}
     } catch {
       setError("Intelligence generation failed. The data sources may be temporarily unavailable.");
     }
@@ -418,22 +432,37 @@ export function IntelligencePanel({ homeTeam, awayTeam, onBack }: IntelligencePa
                   <PredictionMarketPanel
                     homeTeam={homeTeam}
                     awayTeam={awayTeam}
-                    odds={{ home: 2.1, draw: 3.4, away: 3.8 }}
-                    totalStaked={1250}
+                    odds={marketData?.odds || { home: 2, draw: 3, away: 3 }}
+                    totalStaked={marketData?.totalStaked || 0}
+                    matchStatus={matchStatus}
+                    stakeError={stakeError}
                     onStake={async (side, amount) => {
+                      setStakeError(null);
                       try {
                         const res = await fetch("/api/market/stake", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ homeTeam, awayTeam, side, amount }),
+                          body: JSON.stringify({ homeTeam, awayTeam, side, amount, matchStatus }),
                         });
-                        if (res.ok) {
-                          const data = await res.json();
+                        const data = await res.json();
+                        if (res.ok && data.success) {
                           if (data.cctpTransfer) {
                             setCctpTransfers((prev) => [...prev, data.cctpTransfer]);
                           }
+                          // Refresh market data
+                          const marketRes = await fetch(`/api/market?homeTeam=${encodeURIComponent(homeTeam)}&awayTeam=${encodeURIComponent(awayTeam)}`);
+                          if (marketRes.ok) {
+                            const marketJson = await marketRes.json();
+                            if (marketJson.market) {
+                              setMarketData({ odds: marketJson.market.odds, totalStaked: marketJson.market.totalStaked });
+                            }
+                          }
+                        } else {
+                          setStakeError(data.error || "Stake failed");
                         }
-                      } catch {}
+                      } catch {
+                        setStakeError("Network error — stake failed");
+                      }
                     }}
                     cctpTransfers={cctpTransfers}
                   />

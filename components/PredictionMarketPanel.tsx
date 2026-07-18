@@ -11,6 +11,8 @@ interface PredictionMarketPanelProps {
   totalStaked: number;
   onStake: (side: "home" | "draw" | "away", amount: number) => void;
   isResolving?: boolean;
+  matchStatus?: string;
+  stakeError?: string | null;
   cctpTransfers?: {
     id: string;
     fromChain: string;
@@ -42,6 +44,8 @@ export function PredictionMarketPanel({
   totalStaked,
   onStake,
   isResolving = false,
+  matchStatus,
+  stakeError,
   cctpTransfers = [],
 }: PredictionMarketPanelProps) {
   const [selectedSide, setSelectedSide] = useState<Side | null>(null);
@@ -49,6 +53,7 @@ export function PredictionMarketPanel({
 
   const parsedAmount = parseFloat(amount);
   const validAmount = !isNaN(parsedAmount) && parsedAmount > 0;
+  const isLocked = matchStatus === "LIVE" || matchStatus === "FINISHED";
 
   const handleStake = useCallback(() => {
     if (!selectedSide || !validAmount) return;
@@ -78,7 +83,7 @@ export function PredictionMarketPanel({
       className={cn(
         "bg-surface-2 border border-border-subtle rounded-xl overflow-hidden",
         "transition-opacity duration-300",
-        isResolving && "opacity-70 pointer-events-none"
+        (isResolving || isLocked) && "opacity-70 pointer-events-none"
       )}
     >
       {isResolving && (
@@ -90,6 +95,19 @@ export function PredictionMarketPanel({
       )}
 
       <div className="p-4">
+        {isLocked && (
+          <div className="mb-4 p-3 bg-accent-yellow-dim border border-accent-yellow/20 rounded-lg text-center">
+            <span className="text-xs font-medium text-accent-yellow">
+              {matchStatus === "LIVE" ? "Match is live — staking locked" : "Match is finished — staking closed"}
+            </span>
+          </div>
+        )}
+
+        {stakeError && (
+          <div className="mb-4 p-3 bg-accent-red-dim border border-accent-red/20 rounded-lg">
+            <span className="text-xs font-medium text-accent-red">{stakeError}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-accent-purple-dim flex items-center justify-center">
@@ -115,14 +133,14 @@ export function PredictionMarketPanel({
               <button
                 key={side}
                 onClick={() => setSelectedSide(isSelected ? null : side)}
-                disabled={isResolving}
+                disabled={isResolving || isLocked}
                 className={cn(
                   "relative flex flex-col items-center gap-1 p-3 rounded-lg border transition-all duration-150 cursor-pointer",
                   "focus-ring",
                   isSelected
                     ? "bg-accent-green-dim border-accent-green/40 text-text-primary"
                     : "bg-surface-3 border-border-subtle hover:border-border text-text-secondary hover:text-text-primary",
-                  isResolving && "cursor-not-allowed"
+                  (isResolving || isLocked) && "cursor-not-allowed"
                 )}
               >
                 <span className="text-2xs text-text-muted truncate max-w-full">
@@ -162,7 +180,7 @@ export function PredictionMarketPanel({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              disabled={isResolving}
+              disabled={isResolving || isLocked}
               min="0"
               step="0.01"
               className={cn(
@@ -176,12 +194,12 @@ export function PredictionMarketPanel({
 
         <button
           onClick={handleStake}
-          disabled={!selectedSide || !validAmount || isResolving}
+          disabled={!selectedSide || !validAmount || isResolving || isLocked}
           className={cn(
             "w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg",
             "text-sm font-semibold transition-all duration-200 cursor-pointer",
             "focus-ring",
-            selectedSide && validAmount && !isResolving
+            selectedSide && validAmount && !isResolving && !isLocked
               ? "bg-accent-green text-black hover:bg-accent-green/90"
               : "bg-surface-4 text-text-muted cursor-not-allowed"
           )}
