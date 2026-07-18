@@ -18,6 +18,7 @@ import { SpecialistCard } from "./SpecialistCard";
 import DebateFeed from "./DebateFeed";
 import { PremiumReportCard } from "./PremiumReportCard";
 import { PredictionMarketPanel } from "./PredictionMarketPanel";
+import { X402PaymentModal } from "./X402PaymentModal";
 import { ConfidenceGauge } from "./ConfidenceGauge";
 
 interface IntelligencePanelProps {
@@ -91,6 +92,12 @@ export function IntelligencePanel({ homeTeam, awayTeam, matchStatus, onBack }: I
   const [showMarket, setShowMarket] = useState(false);
   const [marketData, setMarketData] = useState<{ odds: { home: number; draw: number; away: number }; totalStaked: number } | null>(null);
   const [stakeError, setStakeError] = useState<string | null>(null);
+  const [x402Modal, setX402Modal] = useState<{
+    show: boolean;
+    reportType: string;
+    reportTitle: string;
+    paymentInfo: { amount: string; token: string; chain: string; networkId: string; endpoint: string };
+  } | null>(null);
   const [cctpTransfers, setCctpTransfers] = useState<{
     id: string;
     fromChain: string;
@@ -184,6 +191,38 @@ export function IntelligencePanel({ homeTeam, awayTeam, matchStatus, onBack }: I
       const res = await fetch("/api/reports/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ homeTeam, awayTeam, reportType: type }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReportContents((prev) => ({ ...prev, [type]: data.content }));
+        setPurchasedReports((prev) => new Set([...prev, type]));
+      } else if (res.status === 402) {
+        const data = await res.json();
+        const meta = reportCatalog.find((r) => r.type === type);
+        setX402Modal({
+          show: true,
+          reportType: type,
+          reportTitle: meta?.title || type,
+          paymentInfo: data.payment,
+        });
+      }
+    } catch {}
+    setLoadingReport(null);
+  };
+
+  const handleX402PaymentSimulated = async () => {
+    if (!x402Modal) return;
+    const type = x402Modal.reportType;
+    setX402Modal(null);
+    setLoadingReport(type);
+    try {
+      const res = await fetch("/api/reports/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-PAYMENT": "x402/payment; amount=0.002 USDC; chain=injective-testnet; protocol=x402; version=1",
+        },
         body: JSON.stringify({ homeTeam, awayTeam, reportType: type }),
       });
       if (res.ok) {
@@ -521,6 +560,18 @@ export function IntelligencePanel({ homeTeam, awayTeam, matchStatus, onBack }: I
           </div>
         )}
       </main>
+
+      {/* x402 Payment Modal */}
+      {x402Modal && (
+        <X402PaymentModal
+          isOpen={x402Modal.show}
+          onClose={() => setX402Modal(null)}
+          onPaymentSimulated={handleX402PaymentSimulated}
+          reportType={x402Modal.reportType}
+          reportTitle={x402Modal.reportTitle}
+          paymentInfo={x402Modal.paymentInfo}
+        />
+      )}
     </div>
   );
 }
