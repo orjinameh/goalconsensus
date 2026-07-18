@@ -11,6 +11,7 @@ import { computePrediction, type PredictionResult } from "./prediction-engine";
 import { verifyProviderScores, type VerificationResult } from "./verification-engine";
 import { runDebate } from "./debate-engine";
 import { generatePremiumReport, getReportCatalog } from "./premium-reports";
+import { cachePrediction, getCachedPrediction } from "./predictions-cache";
 import type { CanonicalMatchState, AgentOutput, DebateMessage, AIConsensus, PremiumReport, PremiumReportType } from "./agents/types";
 import { SingleFlight } from "./llm/single-flight";
 
@@ -191,12 +192,30 @@ export async function getIntelligence(
       };
     }
 
+    // For finished matches, try to return the original pre-match predictions
+    if (canonicalState.status === "FINISHED") {
+      const cached = await getCachedPrediction(homeTeam, awayTeam);
+      if (cached) {
+        return {
+          canonicalState,
+          specialistOutputs: cached.specialistOutputs,
+          debate: cached.debate,
+          prediction: cached.prediction,
+        };
+      }
+    }
+
     const specialistResults = await Promise.all(
       specialistAgents.map((agent) => agent.verify(canonicalState))
     );
 
     const debate = runDebate(specialistResults, canonicalState);
     const prediction = computePrediction(specialistResults, canonicalState);
+
+    // Cache predictions for scheduled matches so they're preserved after kickoff
+    if (canonicalState.status === "SCHEDULED") {
+      await cachePrediction(homeTeam, awayTeam, specialistResults, debate, prediction);
+    }
 
     return {
       canonicalState,
