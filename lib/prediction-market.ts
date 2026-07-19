@@ -1,10 +1,17 @@
 import type { PredictionMarketState, PredictionMarketOdds, PredictionMarketPosition, AgentOutput } from "./agents/types";
-import { transferUSDC, getHouseBalance, USDC_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from "./settlement";
+import { transferUSDC } from "./settlement";
 import { getTeamRating } from "./team-ratings";
 import { connectToDatabase } from "./mongodb";
 
 function marketKey(homeTeam: string, awayTeam: string): string {
   return `${homeTeam.toLowerCase()}|${awayTeam.toLowerCase()}`;
+}
+
+// In-memory fallback when MongoDB is unavailable
+const memoryMarkets = new Map<string, PredictionMarketState>();
+
+async function db() {
+  return connectToDatabase();
 }
 
 function computeEloOdds(homeRating: number, awayRating: number): PredictionMarketOdds {
@@ -41,7 +48,6 @@ function computeAgentAdjustedOdds(
   const activeAgents = agentOutputs.filter((a) => a.confidence > 0);
   if (activeAgents.length === 0) return eloOdds;
 
-  // Compute agent-implied probabilities from votes + confidence
   let homeVotes = 0;
   let awayVotes = 0;
   let drawVotes = 0;
@@ -65,8 +71,6 @@ function computeAgentAdjustedOdds(
   const agentDrawProb = drawVotes / totalConfidence;
   const agentAwayProb = awayVotes / totalConfidence;
 
-  // Blend: 50% Elo + 50% agent consensus
-  const blend = 0.5;
   const margin = 1.05;
   const homeProb = ((eloOdds.home + agentHomeProb) / 2) * margin;
   const drawProb = ((eloOdds.draw + agentDrawProb) / 2) * margin;
@@ -107,14 +111,25 @@ export async function getOrCreateMarket(
   homeRating: number,
   awayRating: number
 ): Promise<PredictionMarketState> {
-  const db = await connectToDatabase();
   const key = marketKey(homeTeam, awayTeam);
-  const existing = await db.collection("markets").findOne({ matchKey: key });
-  if (existing) return existing as unknown as PredictionMarketState;
 
-  const market = freshMarket(homeTeam, awayTeam, homeRating, awayRating);
-  await db.collection("markets").insertOne(market as never);
-  return market;
+  try {
+    const d = await db();
+    const existing = await d.collection("markets").findOne({ matchKey: key });
+    if (existing) return existing as unknown as PredictionMarketState;
+
+    const market = freshMarket(homeTeam, awayTeam, homeRating, awayRating);
+    await d.collection("markets").insertOne(market as never);
+    return market;
+  } catch {
+    // MongoDB unavailable — use in-memory store
+    const existing = memoryMarkets.get(key);
+    if (existing) return existing;
+
+    const market = freshMarket(homeTeam, awayTeam, homeRating, awayRating);
+    memoryMarkets.set(key, market);
+    return market;
+  }
 }
 
 export async function updateMarketOdds(
@@ -122,7 +137,6 @@ export async function updateMarketOdds(
   awayTeam: string,
   agentOutputs: AgentOutput[],
 ): Promise<PredictionMarketState> {
-  const db = await connectToDatabase();
   const key = marketKey(homeTeam, awayTeam);
   const homeRating = getTeamRating(homeTeam).elo;
   const awayRating = getTeamRating(awayTeam).elo;
@@ -133,16 +147,20 @@ export async function updateMarketOdds(
   const newOdds = computeAgentAdjustedOdds(homeRating, awayRating, agentOutputs, homeTeam, awayTeam);
   market.odds = newOdds;
 
-  // Recompute position payouts with new odds
   for (const pos of market.positions) {
     pos.odds = newOdds[pos.side];
     pos.potentialPayout = pos.amount * (1 / pos.odds);
   }
 
-  await db.collection("markets").updateOne(
-    { matchKey: key },
-    { $set: { odds: market.odds, positions: market.positions } }
-  );
+  try {
+    const d = await db();
+    await d.collection("markets").updateOne(
+      { matchKey: key },
+      { $set: { odds: market.odds, positions: market.positions } }
+    );
+  } catch {
+    memoryMarkets.set(key, market);
+  }
 
   return market;
 }
@@ -160,7 +178,6 @@ export async function placeBet(
     return { success: false, market, error: `Cannot bet on ${matchStatus.toLowerCase()} matches` };
   }
 
-  const db = await connectToDatabase();
   const key = marketKey(homeTeam, awayTeam);
   let market = await getOrCreateMarket(homeTeam, awayTeam, getTeamRating(homeTeam).elo, getTeamRating(awayTeam).elo);
 
@@ -174,7 +191,6 @@ export async function placeBet(
   position.potentialPayout = position.amount * (1 / position.odds);
   market.totalStaked += amount;
 
-  // Real CCTP transfer — USDC from user (or house escrow) to settlement contract
   const recipient = userAddress || `0x${Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`;
   const settlement = await transferUSDC(recipient, amount);
 
@@ -198,30 +214,33 @@ export async function placeBet(
     timestamp: new Date().toISOString(),
   });
 
-  await db.collection("markets").updateOne(
-    { matchKey: key },
-    { $set: { odds: market.odds, totalStaked: market.totalStaked, positions: market.positions, cctpTransfers: market.cctpTransfers } }
-  );
-
-  await db.collection("bets").insertOne({
-    userAddress: userAddress || "anonymous",
-    marketKey: key,
-    homeTeam,
-    awayTeam,
-    side,
-    amount,
-    odds: position.odds,
-    potentialPayout: position.potentialPayout,
-    cctpTransferId: cctpTransfer.id,
-    cctpTxHash: cctpTransfer.txHash,
-    createdAt: new Date().toISOString(),
-  });
-
-  if (userAddress) {
-    await db.collection("users").updateOne(
-      { address: userAddress.toLowerCase() },
-      { $inc: { totalStaked: amount, betsCount: 1 } }
+  try {
+    const d = await db();
+    await d.collection("markets").updateOne(
+      { matchKey: key },
+      { $set: { odds: market.odds, totalStaked: market.totalStaked, positions: market.positions, cctpTransfers: market.cctpTransfers } }
     );
+    await d.collection("bets").insertOne({
+      userAddress: userAddress || "anonymous",
+      marketKey: key,
+      homeTeam,
+      awayTeam,
+      side,
+      amount,
+      odds: position.odds,
+      potentialPayout: position.potentialPayout,
+      cctpTransferId: cctpTransfer.id,
+      cctpTxHash: cctpTransfer.txHash,
+      createdAt: new Date().toISOString(),
+    });
+    if (userAddress) {
+      await d.collection("users").updateOne(
+        { address: userAddress.toLowerCase() },
+        { $inc: { totalStaked: amount, betsCount: 1 } }
+      );
+    }
+  } catch {
+    memoryMarkets.set(key, market);
   }
 
   return { success: true, market, cctpTransfer };
@@ -232,7 +251,6 @@ export async function resolveMarket(
   awayTeam: string,
   result: "home" | "draw" | "away"
 ): Promise<{ market: PredictionMarketState; winners: { side: string; payout: number; cctpSettlement?: { id: string; fromChain: string; toChain: string; amount: string; status: string; txHash: string; explorerUrl: string | null } }[] }> {
-  const db = await connectToDatabase();
   const key = marketKey(homeTeam, awayTeam);
   let market = await getOrCreateMarket(homeTeam, awayTeam, 1500, 1500);
 
@@ -243,7 +261,6 @@ export async function resolveMarket(
 
   for (const pos of market.positions) {
     if (pos.side === result && pos.amount > 0) {
-      // Real USDC payout from house wallet to winning addresses
       const winnerAddress = `0x${Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`;
       const settlement = await transferUSDC(winnerAddress, pos.potentialPayout);
 
@@ -252,7 +269,7 @@ export async function resolveMarket(
         fromChain: "injective-testnet" as string,
         toChain: "base-sepolia" as string,
         amount: pos.potentialPayout.toFixed(2),
-        status: settlement.success ? "confirmed" : "failed",
+        status: settlement.success ? "confirmed" : "failed" as string,
         txHash: settlement.txHash || `0x${Array.from({ length: 64 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")}`,
         explorerUrl: settlement.explorerUrl,
       };
@@ -273,23 +290,37 @@ export async function resolveMarket(
     }
   }
 
-  await db.collection("markets").updateOne(
-    { matchKey: key },
-    { $set: { resolved: true, result, settlementTxHash: market.settlementTxHash, cctpTransfers: market.cctpTransfers } }
-  );
+  try {
+    const d = await db();
+    await d.collection("markets").updateOne(
+      { matchKey: key },
+      { $set: { resolved: true, result, settlementTxHash: market.settlementTxHash, cctpTransfers: market.cctpTransfers } }
+    );
+  } catch {
+    memoryMarkets.set(key, market);
+  }
 
   return { market, winners };
 }
 
 export async function getMarket(homeTeam: string, awayTeam: string): Promise<PredictionMarketState | null> {
-  const db = await connectToDatabase();
   const key = marketKey(homeTeam, awayTeam);
-  const doc = await db.collection("markets").findOne({ matchKey: key });
-  return (doc as unknown as PredictionMarketState) || null;
+
+  try {
+    const d = await db();
+    const doc = await d.collection("markets").findOne({ matchKey: key });
+    return (doc as unknown as PredictionMarketState) || null;
+  } catch {
+    return memoryMarkets.get(key) || null;
+  }
 }
 
 export async function getAllMarkets(): Promise<PredictionMarketState[]> {
-  const db = await connectToDatabase();
-  const docs = await db.collection("markets").find({}).toArray();
-  return docs as unknown as PredictionMarketState[];
+  try {
+    const d = await db();
+    const docs = await d.collection("markets").find({}).toArray();
+    return docs as unknown as PredictionMarketState[];
+  } catch {
+    return Array.from(memoryMarkets.values());
+  }
 }
