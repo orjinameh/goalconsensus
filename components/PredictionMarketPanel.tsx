@@ -20,6 +20,7 @@ interface PredictionMarketPanelProps {
     amount: string;
     status: "pending" | "confirmed" | "failed";
     txHash: string;
+    explorerUrl?: string | null;
     timestamp: string;
   }[];
 }
@@ -272,14 +273,30 @@ export function PredictionMarketPanel({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-text-secondary">${t.amount}</span>
-                  <span className={cn(
-                    "px-1.5 py-0.5 rounded text-2xs font-medium",
-                    t.status === "confirmed" ? "bg-accent-green-dim text-accent-green" :
-                    t.status === "pending" ? "bg-accent-yellow-dim text-accent-yellow" :
-                    "bg-red-500/10 text-red-400"
-                  )}>
-                    {t.status}
-                  </span>
+                  {t.explorerUrl ? (
+                    <a
+                      href={t.explorerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-2xs font-medium hover:underline",
+                        t.status === "confirmed" ? "bg-accent-green-dim text-accent-green" :
+                        t.status === "pending" ? "bg-accent-yellow-dim text-accent-yellow" :
+                        "bg-red-500/10 text-red-400"
+                      )}
+                    >
+                      {t.status} ↗
+                    </a>
+                  ) : (
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded text-2xs font-medium",
+                      t.status === "confirmed" ? "bg-accent-green-dim text-accent-green" :
+                      t.status === "pending" ? "bg-accent-yellow-dim text-accent-yellow" :
+                      "bg-red-500/10 text-red-400"
+                    )}>
+                      {t.status}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

@@ -105,6 +105,7 @@ export function IntelligencePanel({ homeTeam, awayTeam, matchStatus, onBack }: I
     amount: string;
     status: "pending" | "confirmed" | "failed";
     txHash: string;
+    explorerUrl?: string | null;
     timestamp: string;
   }[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +156,20 @@ export function IntelligencePanel({ homeTeam, awayTeam, matchStatus, onBack }: I
       await new Promise((r) => setTimeout(r, 400));
       setPhase("ready");
 
-      // Fetch real market data
+      // Push agent predictions into the market odds
+      try {
+        await fetch("/api/market", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            homeTeam,
+            awayTeam,
+            agentOutputs: data.specialistOutputs,
+          }),
+        });
+      } catch {}
+
+      // Fetch real market data (now agent-adjusted)
       try {
         const marketRes = await fetch(`/api/market?homeTeam=${encodeURIComponent(homeTeam)}&awayTeam=${encodeURIComponent(awayTeam)}`);
         if (marketRes.ok) {

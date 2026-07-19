@@ -20,7 +20,9 @@ export async function POST(request: Request) {
       success: true,
       market: result.market,
       cctpTransfer: result.cctpTransfer,
-      message: `Stake of $${amount} on ${side} placed. CCTP transfer ${result.cctpTransfer?.id} initiated from Base Sepolia → Injective Testnet.`,
+      message: result.cctpTransfer?.explorerUrl
+        ? `Stake of $${amount} on ${side} placed. CCTP transfer confirmed: ${result.cctpTransfer.explorerUrl}`
+        : `Stake of $${amount} on ${side} placed. CCTP transfer ${result.cctpTransfer?.id} initiated from Base Sepolia → Injective Testnet.`,
     });
   } catch {
     return NextResponse.json({ error: "Stake failed" }, { status: 500 });

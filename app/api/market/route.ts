@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getOrCreateMarket, getAllMarkets } from "@/lib/prediction-market";
+import { getOrCreateMarket, getAllMarkets, updateMarketOdds } from "@/lib/prediction-market";
 import { getTeamRating } from "@/lib/team-ratings";
+import type { AgentOutput } from "@/lib/agents/types";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -16,4 +17,23 @@ export async function GET(request: Request) {
 
   const markets = await getAllMarkets();
   return NextResponse.json({ markets });
+}
+
+export async function POST(request: Request) {
+  try {
+    const { homeTeam, awayTeam, agentOutputs } = await request.json();
+    if (!homeTeam || !awayTeam) {
+      return NextResponse.json({ error: "homeTeam and awayTeam required" }, { status: 400 });
+    }
+
+    const market = await updateMarketOdds(
+      homeTeam,
+      awayTeam,
+      (agentOutputs || []) as AgentOutput[],
+    );
+
+    return NextResponse.json({ market });
+  } catch {
+    return NextResponse.json({ error: "Failed to update odds" }, { status: 500 });
+  }
 }

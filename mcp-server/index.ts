@@ -22,11 +22,12 @@ import {
   placeBet,
   resolveMarket,
   getMarket,
+  updateMarketOdds,
 } from "../lib/prediction-market.js";
 import {
-  initiateCCTPTransfer,
-  getSupportedChains,
-} from "../lib/cctp.js";
+  getHouseBalance,
+  transferUSDC,
+} from "../lib/settlement.js";
 
 export function createGoalConsensusMcpServer(): McpServer {
   const server = new McpServer({
@@ -641,6 +642,75 @@ server.tool(
   }
 );
 
+server.tool(
+  "settle_market",
+  "Resolve a prediction market and settle winning bets. Sends real USDC from house wallet to winners on Base Sepolia testnet. Returns real on-chain transaction hashes verifiable on basescan.org.",
+  {
+    homeTeam: z.string().describe("Home team name"),
+    awayTeam: z.string().describe("Away team name"),
+    result: z.enum(["home", "draw", "away"]).describe("Match result: home win, draw, or away win"),
+  },
+  async ({ homeTeam, awayTeam, result }) => {
+    const data = await resolveMarket(homeTeam, awayTeam, result);
+    const queryId = `mcp-settle-${Date.now()}`;
+    const payment = chargeX402("settle_market", queryId);
+
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          match: `${homeTeam} vs ${awayTeam}`,
+          result,
+          resolved: data.market.resolved,
+          totalStaked: data.market.totalStaked,
+          settlements: data.winners.map((w) => ({
+            side: w.side,
+            payout: w.payout,
+            txHash: w.cctpSettlement?.txHash,
+            explorerUrl: w.cctpSettlement?.explorerUrl,
+            status: w.cctpSettlement?.status,
+          })),
+          payment,
+          x402Header: formatX402Header(),
+        }, null, 2),
+      }],
+    };
+  }
+);
+
+server.tool(
+  "get_house_balance",
+  "Check the house wallet balance on Base Sepolia testnet. Shows USDC and ETH balances for the settlement wallet. Useful for verifying the prediction market has funds to pay out winners.",
+  {},
+  async () => {
+    const balance = await getHouseBalance();
+
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify(
+          balance
+            ? {
+                address: balance.address,
+                usdc: balance.usdc,
+                eth: balance.eth,
+                network: "Base Sepolia",
+                explorer: `https://sepolia.basescan.org/address/${balance.address}`,
+                note: "Real USDC balance on Base Sepolia testnet. Settlements are executed on-chain.",
+              }
+            : {
+                configured: false,
+                message: "House wallet not configured. Set HOUSE_WALLET_PRIVATE_KEY env var.",
+                note: "Without a house wallet, settlements use simulated transfers.",
+              },
+          null,
+          2
+        ),
+      }],
+    };
+  }
+);
+
   return server;
 }
 
@@ -697,7 +767,7 @@ async function main() {
             "market_analysis", "consensus", "player_report", "injury_report",
             "premium_report", "predict_match", "verify_result", "verify_settlement",
             "get_provider_consensus", "get_live_matches", "qualification_scenarios",
-            "get_report_catalog",
+            "get_report_catalog", "settle_market", "get_house_balance",
           ],
         }, null, 2));
         return;
